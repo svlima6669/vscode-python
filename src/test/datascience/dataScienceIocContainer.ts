@@ -21,6 +21,7 @@ import {
     WorkspaceFolder
 } from 'vscode';
 import * as vsls from 'vsls/vscode';
+
 import { ILanguageServer, ILanguageServerAnalysisOptions } from '../../client/activation/types';
 import { TerminalManager } from '../../client/common/application/terminalManager';
 import {
@@ -84,6 +85,7 @@ import {
     IAsyncDisposableRegistry,
     IConfigurationService,
     ICurrentProcess,
+    IDataScienceSettings,
     IExperimentsManager,
     IExtensions,
     ILogger,
@@ -458,7 +460,6 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
             sendSelectionToInteractiveWindow: false,
             codeRegularExpression: '^(#\\s*%%|#\\s*\\<codecell\\>|#\\s*In\\[\\d*?\\]|#\\s*In\\[ \\])',
             markdownRegularExpression: '^(#\\s*%%\\s*\\[markdown\\]|#\\s*\\<markdowncell\\>)',
-            showJupyterVariableExplorer: true,
             variableExplorerExclude: 'module;function;builtin_function_or_method',
             liveShareConnectionTimeout: 100,
             enablePlotViewer: true,
@@ -519,7 +520,8 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
         this.pythonSettings.terminal = {
             executeInFileDir: false,
             launchArgs: [],
-            activateEnvironment: true
+            activateEnvironment: true,
+            activateEnvInCurrentTerminal: false
         };
 
         condaService.setup(c => c.isCondaAvailable()).returns(() => Promise.resolve(false));
@@ -622,7 +624,7 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
         const webPanel = TypeMoq.Mock.ofType<IWebPanel>();
 
         // Setup the webpanel provider so that it returns our dummy web panel. It will have to talk to our global JSDOM window so that the react components can link into it
-        this.webPanelProvider.setup(p => p.create(TypeMoq.It.isAny(), TypeMoq.It.isAny(), TypeMoq.It.isAnyString(), TypeMoq.It.isAnyString(), TypeMoq.It.isAnyString(), TypeMoq.It.isAny())).returns(
+        this.webPanelProvider.setup(p => p.create(TypeMoq.It.isAny(), TypeMoq.It.isAny(), TypeMoq.It.isAnyString(), TypeMoq.It.isAnyString(), TypeMoq.It.isAny(), TypeMoq.It.isAny(), TypeMoq.It.isAny())).returns(
             (_viewColumn: ViewColumn, listener: IWebPanelMessageListener, _title: string, _script: string, _css: string) => {
                 // Keep track of the current listener. It listens to messages through the vscode api
                 this.webPanelListener = listener;
@@ -677,8 +679,9 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
         return this.pythonSettings;
     }
 
-    public forceSettingsChanged(newPath: string) {
+    public forceSettingsChanged(newPath: string, datascienceSettings?: IDataScienceSettings) {
         this.pythonSettings.pythonPath = newPath;
+        this.pythonSettings.datascience = datascienceSettings ? datascienceSettings : this.pythonSettings.datascience;
         this.pythonSettings.fireChangeEvent();
         this.configChangeEvent.fire({
             affectsConfiguration(_s: string, _r?: Uri): boolean {

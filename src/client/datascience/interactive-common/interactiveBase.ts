@@ -112,7 +112,8 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
         @unmanaged() private jupyterDebugger: IJupyterDebugger,
         @unmanaged() protected ipynbProvider: INotebookEditorProvider,
         @unmanaged() protected errorHandler: IDataScienceErrorHandler,
-        @unmanaged() indexPath: string,
+        @unmanaged() rootPath: string,
+        @unmanaged() scripts: string[],
         @unmanaged() title: string,
         @unmanaged() viewColumn: ViewColumn
     ) {
@@ -123,7 +124,8 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
             themeFinder,
             workspaceService,
             (c, v, d) => new InteractiveWindowMessageListener(liveShare, c, v, d),
-            indexPath,
+            rootPath,
+            scripts,
             title,
             viewColumn);
 
@@ -1092,7 +1094,7 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
 
         if (this.notebook) {
             const uri: Uri = await this.getNotebookIdentity();
-            this.postMessage(InteractiveWindowMessages.NotebookExecutionActivated, uri).ignoreErrors();
+            this.postMessage(InteractiveWindowMessages.NotebookExecutionActivated, uri.toString()).ignoreErrors();
         }
 
         traceInfo('Connected to jupyter server.');
