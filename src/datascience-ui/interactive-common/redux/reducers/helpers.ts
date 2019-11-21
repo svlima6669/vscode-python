@@ -71,6 +71,7 @@ export namespace Helpers {
             // and the user has updated the cell text since then.
             newVMs[index] = {
                 ...newVMs[index],
+                hasBeenRun: true,
                 cell: {
                     ...newVMs[index].cell,
                     state: arg.payload.state,
