@@ -1,4 +1,4 @@
-import { Cell as IGatherCell, CellSlice, DataflowAnalyzer, ExecutionLogSlicer } from '../../../python-program-analysis/src';
+import { Cell as IGatherCell, CellSlice, DataflowAnalyzer, ExecutionLogSlicer } from '@msrvida/python-program-analysis';
 
 import { inject, injectable } from 'inversify';
 import * as uuid from 'uuid/v4';
