@@ -135,7 +135,6 @@ export enum Telemetry {
     /**
      * Whether auto save feature in VS Code is enabled or not.
      */
-    AutoSaveEnabled = 'DATASCIENCE.AUTO_SAVE_ENABLED',
     ShowHistoryPane = 'DATASCIENCE.SHOW_HISTORY_PANE',
     ExpandAll = 'DATASCIENCE.EXPAND_ALL',
     CollapseAll = 'DATASCIENCE.COLLAPSE_ALL',
@@ -210,6 +209,7 @@ export enum Telemetry {
     NotebookExecutionActivated = 'DATASCIENCE.NOTEBOOK.EXECUTION.ACTIVATED',
     JupyterNotInstalledErrorShown = 'DATASCIENCE.JUPYTER_NOT_INSTALLED_ERROR_SHOWN',
     JupyterCommandSearch = 'DATASCIENCE.JUPYTER_COMMAND_SEARCH',
+    RegisterInterpreterAsKernel = 'DATASCIENCE.JUPYTER_REGISTER_INTERPRETER_AS_KERNEL',
     UserInstalledJupyter = 'DATASCIENCE.USER_INSTALLED_JUPYTER',
     UserDidNotInstallJupyter = 'DATASCIENCE.USER_DID_NOT_INSTALL_JUPYTER'
 }
