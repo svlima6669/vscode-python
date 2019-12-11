@@ -101,7 +101,7 @@ export class GatherExecution implements IGatherExecution {
  */
 function concat(existingText: string, newText: CellSlice): string {
     // Include our cell marker so that cell slices are preserved
-    return `${existingText}#%%\n${newText.cell.text}\n`;
+    return `${existingText}#%%\n${newText.textSlice}\n`;
 }
 
 /**
