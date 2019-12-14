@@ -3,7 +3,7 @@
 'use strict';
 import '../../common/extensions';
 
-import { inject, injectable, multiInject, optional } from 'inversify';
+import { inject, injectable } from 'inversify';
 import * as uuid from 'uuid/v4';
 import { Uri } from 'vscode';
 import { CancellationToken } from 'vscode-jsonrpc';
@@ -12,12 +12,12 @@ import * as vsls from 'vsls/vscode';
 import { IApplicationShell, ILiveShareApi, IWorkspaceService } from '../../common/application/types';
 import { IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry } from '../../common/types';
 import { IInterpreterService } from '../../interpreter/contracts';
+import { IServiceContainer } from '../../ioc/types';
 import {
     IConnection,
     IDataScience,
     IJupyterSessionManagerFactory,
     INotebook,
-    INotebookExecutionLogger,
     INotebookServer,
     INotebookServerLaunchInfo
 } from '../types';
@@ -38,7 +38,7 @@ type JupyterServerClassType = {
         configService: IConfigurationService,
         sessionManager: IJupyterSessionManagerFactory,
         workspaceService: IWorkspaceService,
-        loggers: INotebookExecutionLogger[],
+        serviceContainer: IServiceContainer,
         appShell: IApplicationShell,
         interpreterService: IInterpreterService
     ): IJupyterServerInterface;
@@ -60,7 +60,7 @@ export class JupyterServerFactory implements INotebookServer, ILiveShareHasRole 
         @inject(IConfigurationService) configService: IConfigurationService,
         @inject(IJupyterSessionManagerFactory) sessionManager: IJupyterSessionManagerFactory,
         @inject(IWorkspaceService) workspaceService: IWorkspaceService,
-        @multiInject(INotebookExecutionLogger) @optional() loggers: INotebookExecutionLogger[] | undefined,
+        @inject(IServiceContainer) serviceContainer: IServiceContainer,
         @inject(IApplicationShell) appShell: IApplicationShell,
         @inject(IInterpreterService) interpreterService: IInterpreterService) {
         this.serverFactory = new RoleBasedFactory<IJupyterServerInterface, JupyterServerClassType>(
@@ -74,7 +74,7 @@ export class JupyterServerFactory implements INotebookServer, ILiveShareHasRole 
             configService,
             sessionManager,
             workspaceService,
-            loggers ? loggers : [],
+            serviceContainer,
             appShell,
             interpreterService
         );

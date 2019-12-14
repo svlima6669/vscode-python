@@ -13,6 +13,7 @@ import { traceInfo } from '../../../common/logger';
 import { IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry } from '../../../common/types';
 import * as localize from '../../../common/utils/localize';
 import { StopWatch } from '../../../common/utils/stopWatch';
+import { IServiceContainer } from '../../../ioc/types';
 import { sendTelemetryEvent } from '../../../telemetry';
 import { Identifiers, LiveShare, LiveShareCommands, RegExpValues, Telemetry } from '../../constants';
 import {
@@ -21,7 +22,6 @@ import {
     IJupyterSessionManager,
     IJupyterSessionManagerFactory,
     INotebook,
-    INotebookExecutionLogger,
     INotebookServer,
     INotebookServerLaunchInfo
 } from '../../types';
@@ -47,10 +47,10 @@ export class HostJupyterServer
         configService: IConfigurationService,
         sessionManager: IJupyterSessionManagerFactory,
         private workspaceService: IWorkspaceService,
-        loggers: INotebookExecutionLogger[],
+        serviceContainer: IServiceContainer,
         private appService: IApplicationShell
     ) {
-        super(liveShare, asyncRegistry, disposableRegistry, configService, sessionManager, loggers);
+        super(liveShare, asyncRegistry, disposableRegistry, configService, sessionManager, serviceContainer);
     }
 
     public async dispose(): Promise<void> {
@@ -138,7 +138,7 @@ export class HostJupyterServer
         possibleSession: IJupyterSession | undefined,
         disposableRegistry: IDisposableRegistry,
         configService: IConfigurationService,
-        loggers: INotebookExecutionLogger[],
+        serviceContainer: IServiceContainer,
         cancelToken?: CancellationToken): Promise<INotebook> {
 
         // See if already exists.
@@ -174,11 +174,12 @@ export class HostJupyterServer
                 disposableRegistry,
                 this,
                 launchInfo,
-                loggers,
+                serviceContainer,
                 resource,
                 this.getDisposedError.bind(this),
                 this.workspaceService,
-                this.appService);
+                this.appService
+            );
 
             // Wait for it to be ready
             traceInfo(`Waiting for idle (session) ${this.id}`);

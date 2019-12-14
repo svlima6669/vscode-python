@@ -105,7 +105,6 @@ export interface INotebook extends IAsyncDisposable {
     setLaunchingFile(file: string): Promise<void>;
     getSysInfo(): Promise<ICell | undefined>;
     setMatplotLibStyle(useDark: boolean): Promise<void>;
-    addLogger(logger: INotebookExecutionLogger): void;
     getMatchingInterpreter(): PythonInterpreter | undefined;
     getKernelSpec(): IJupyterKernelSpec | undefined;
 }
@@ -132,6 +131,11 @@ export interface IGatherExecution {
     logExecution(vscCell: ICell): void;
     gatherCode(vscCell: ICell): string;
     resetLog(): void;
+}
+
+export const IGatherLogger = Symbol('IGatherLogger');
+export interface IGatherLogger {
+    service(): IGatherExecution;
 }
 
 export const IJupyterExecution = Symbol('IJupyterExecution');

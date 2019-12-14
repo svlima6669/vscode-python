@@ -23,6 +23,7 @@ import * as localize from '../../common/utils/localize';
 import { noop } from '../../common/utils/misc';
 import { StopWatch } from '../../common/utils/stopWatch';
 import { PythonInterpreter } from '../../interpreter/contracts';
+import { IServiceContainer } from '../../ioc/types';
 import { captureTelemetry, sendTelemetryEvent } from '../../telemetry';
 import { generateCells } from '../cellFactory';
 import { CellMatcher } from '../cellMatcher';
@@ -154,7 +155,7 @@ export class JupyterNotebookBase implements INotebook {
         private disposableRegistry: IDisposableRegistry,
         private owner: INotebookServer,
         private launchInfo: INotebookServerLaunchInfo,
-        loggers: INotebookExecutionLogger[],
+        serviceContainer: IServiceContainer,
         resource: Uri,
         private getDisposedError: () => Error,
         private workspace: IWorkspaceService,
@@ -162,7 +163,7 @@ export class JupyterNotebookBase implements INotebook {
     ) {
         this.sessionStartTime = Date.now();
         this._resource = resource;
-        this._loggers = [...loggers];
+        this._loggers = serviceContainer.getAll<INotebookExecutionLogger>(INotebookExecutionLogger);
         // Save our interpreter and don't change it. Later on when kernel changes
         // are possible, recompute it.
     }
@@ -262,10 +263,6 @@ export class JupyterNotebookBase implements INotebook {
     public setLaunchingFile(file: string): Promise<void> {
         // Update our working directory if we don't have one set already
         return this.updateWorkingDirectory(file);
-    }
-
-    public addLogger(logger: INotebookExecutionLogger) {
-        this._loggers.push(logger);
     }
 
     public executeObservable(code: string, file: string, line: number, id: string, silent: boolean = false): Observable<ICell[]> {

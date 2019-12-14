@@ -16,7 +16,6 @@ import {
     IDataScience,
     IJupyterSessionManagerFactory,
     INotebook,
-    INotebookExecutionLogger,
     INotebookServer,
     INotebookServerLaunchInfo
 } from '../../types';
@@ -38,8 +37,7 @@ export class GuestJupyterServer
         private disposableRegistry: IDisposableRegistry,
         private configService: IConfigurationService,
         _sessionManager: IJupyterSessionManagerFactory,
-        _workspaceService: IWorkspaceService,
-        _loggers: INotebookExecutionLogger[]
+        _workspaceService: IWorkspaceService
     ) {
         super(liveShare);
     }

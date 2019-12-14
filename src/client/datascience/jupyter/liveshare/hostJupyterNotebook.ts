@@ -14,13 +14,13 @@ import { IApplicationShell, ILiveShareApi, IWorkspaceService } from '../../../co
 import { traceError } from '../../../common/logger';
 import { IConfigurationService, IDisposableRegistry } from '../../../common/types';
 import { createDeferred } from '../../../common/utils/async';
+import { IServiceContainer } from '../../../ioc/types';
 import { Identifiers, LiveShare, LiveShareCommands } from '../../constants';
 import { IExecuteInfo } from '../../interactive-common/interactiveWindowTypes';
 import {
     ICell,
     IJupyterSession,
     INotebook,
-    INotebookExecutionLogger,
     INotebookServer,
     INotebookServerLaunchInfo,
     InterruptResult
@@ -48,13 +48,13 @@ export class HostJupyterNotebook
         disposableRegistry: IDisposableRegistry,
         owner: INotebookServer,
         launchInfo: INotebookServerLaunchInfo,
-        loggers: INotebookExecutionLogger[],
+        serviceContainer: IServiceContainer,
         resource: vscode.Uri,
         getDisposedError: () => Error,
         workspace: IWorkspaceService,
         appService: IApplicationShell
     ) {
-        super(liveShare, session, configService, disposableRegistry, owner, launchInfo, loggers, resource, getDisposedError, workspace, appService);
+        super(liveShare, session, configService, disposableRegistry, owner, launchInfo, serviceContainer, resource, getDisposedError, workspace, appService);
     }
 
     public dispose = async (): Promise<void> => {

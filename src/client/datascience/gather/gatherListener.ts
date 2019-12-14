@@ -10,28 +10,22 @@ import { noop } from '../../common/utils/misc';
 import { generateCellsFromString } from '../cellFactory';
 import { Identifiers } from '../constants';
 import { IInteractiveWindowMapping, InteractiveWindowMessages } from '../interactive-common/interactiveWindowTypes';
-import { ICell, IGatherExecution, IInteractiveWindowListener, IInteractiveWindowProvider, IJupyterExecution, INotebook, INotebookEditorProvider, INotebookExporter } from '../types';
-import { GatherLogger } from './gatherLogger';
+import { ICell, IGatherLogger, IInteractiveWindowListener, INotebookEditorProvider, INotebookExporter } from '../types';
 
 @injectable()
 export class GatherListener implements IInteractiveWindowListener {
     // tslint:disable-next-line: no-any
     private postEmitter: EventEmitter<{ message: string; payload: any }> = new EventEmitter<{ message: string; payload: any }>();
-    private gatherLogger: GatherLogger;
     private notebookUri: Uri | undefined;
 
     constructor(
-        @inject(IGatherExecution) private gather: IGatherExecution,
         @inject(IApplicationShell) private applicationShell: IApplicationShell,
         @inject(INotebookExporter) private jupyterExporter: INotebookExporter,
         @inject(INotebookEditorProvider) private ipynbProvider: INotebookEditorProvider,
-        @inject(IJupyterExecution) private jupyterExecution: IJupyterExecution,
-        @inject(IInteractiveWindowProvider) private interactiveWindowProvider: IInteractiveWindowProvider,
         @inject(IConfigurationService) private configService: IConfigurationService,
         @inject(IDocumentManager) private documentManager: IDocumentManager,
         @inject(IFileSystem) private fileSystem: IFileSystem
     ) {
-        this.gatherLogger = new GatherLogger(this.gather, this.configService);
     }
 
     public dispose() {
@@ -46,16 +40,12 @@ export class GatherListener implements IInteractiveWindowListener {
     // tslint:disable-next-line: no-any
     public onMessage(message: string, payload?: any): void {
         switch (message) {
-            case InteractiveWindowMessages.NotebookExecutionActivated:
-                this.handleMessage(message, payload, this.doSetLogger);
-                break;
-
             case InteractiveWindowMessages.GatherCodeRequest:
                 this.handleMessage(message, payload, this.doGather);
                 break;
 
             case InteractiveWindowMessages.RestartKernel:
-                this.gather.resetLog();
+                this.gatherLogger.service().resetLog();
                 break;
 
             default:
@@ -69,28 +59,6 @@ export class GatherListener implements IInteractiveWindowListener {
         handler.bind(this)(args);
     }
 
-    private doSetLogger(payload: string): void {
-        this.setLogger(payload).ignoreErrors();
-    }
-
-    private async setLogger(notebookUri: string) {
-        this.notebookUri = Uri.parse(notebookUri);
-
-        // First get the active server
-        const activeServer = await this.jupyterExecution.getServer(await this.interactiveWindowProvider.getNotebookOptions());
-
-        let nb: INotebook | undefined;
-        // If that works, see if there's a matching notebook running
-        if (activeServer) {
-            nb = await activeServer.getNotebook(this.notebookUri);
-
-            // If we have an executing notebook, add the gather logger.
-            if (nb) {
-                nb.addLogger(this.gatherLogger);
-            }
-        }
-    }
-
     private doGather(payload: ICell): void {
         this.gatherCodeInternal(payload).catch(err => {
             this.applicationShell.showErrorMessage(err);
@@ -98,7 +66,7 @@ export class GatherListener implements IInteractiveWindowListener {
     }
 
     private gatherCodeInternal = async (cell: ICell) => {
-        const slicedProgram = this.gather.gatherCode(cell);
+        const slicedProgram = this.gatherLogger.service().gatherCode(cell);
 
         if (this.configService.getSettings().datascience.gatherToScript) {
             await this.showFile(slicedProgram, cell.file);

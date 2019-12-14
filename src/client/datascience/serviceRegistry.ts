@@ -60,6 +60,7 @@ import {
     IDataViewerProvider,
     IDebugLocationTracker,
     IGatherExecution,
+    IGatherLogger,
     IInteractiveWindow,
     IInteractiveWindowListener,
     IInteractiveWindowProvider,
@@ -80,6 +81,7 @@ import {
     IStatusProvider,
     IThemeFinder
 } from './types';
+import { GatherLogger } from './gather/gatherLogger';
 
 export function registerTypes(serviceManager: IServiceManager) {
     serviceManager.addSingleton<IDataScienceCodeLensProvider>(IDataScienceCodeLensProvider, DataScienceCodeLensProvider);
@@ -113,10 +115,12 @@ export function registerTypes(serviceManager: IServiceManager) {
     serviceManager.addSingleton<IJupyterDebugger>(IJupyterDebugger, JupyterDebugger);
     serviceManager.add<IDataScienceErrorHandler>(IDataScienceErrorHandler, DataScienceErrorHandler);
     serviceManager.addSingleton<ICodeLensFactory>(ICodeLensFactory, CodeLensFactory);
-    serviceManager.addSingleton<ICellHashProvider>(ICellHashProvider, CellHashProvider);
+    serviceManager.add<ICellHashProvider>(ICellHashProvider, CellHashProvider);
+    serviceManager.add<IGatherLogger>(IGatherLogger, GatherLogger);
     serviceManager.add<IGatherExecution>(IGatherExecution, GatherExecution);
     serviceManager.addBinding(ICellHashProvider, IInteractiveWindowListener);
     serviceManager.addBinding(ICellHashProvider, INotebookExecutionLogger);
+    serviceManager.addBinding(IGatherLogger, INotebookExecutionLogger);
     serviceManager.addBinding(IJupyterDebugger, ICellHashListener);
     serviceManager.addSingleton<INotebookEditorProvider>(INotebookEditorProvider, NativeEditorProvider);
     serviceManager.add<INotebookEditor>(INotebookEditor, NativeEditor);

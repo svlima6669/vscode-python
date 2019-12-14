@@ -5,14 +5,13 @@ import { IConfigurationService } from '../../common/types';
 import { noop } from '../../common/utils/misc';
 import { CellMatcher } from '../cellMatcher';
 import { concatMultilineStringInput } from '../common';
-import { ICell as IVscCell, IGatherExecution, INotebookExecutionLogger } from '../types';
-import { GatherExecution } from './gather';
+import { ICell as IVscCell, IGatherExecution, IGatherLogger, INotebookExecutionLogger } from '../types';
 
 @injectable()
-export class GatherLogger implements INotebookExecutionLogger {
+export class GatherLogger implements INotebookExecutionLogger, IGatherLogger {
 
     constructor(
-        @inject(GatherExecution) private gather: IGatherExecution,
+        @inject(IGatherExecution) private gather: IGatherExecution,
         @inject(IConfigurationService) private configService: IConfigurationService
     ) {
     }
@@ -37,5 +36,9 @@ export class GatherLogger implements INotebookExecutionLogger {
                 this.gather.logExecution(cloneCell);
             }
         }
+    }
+
+    public service() {
+        return this.gather;
     }
 }

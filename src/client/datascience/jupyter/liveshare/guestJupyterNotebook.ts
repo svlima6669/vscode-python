@@ -20,7 +20,6 @@ import {
     IJupyterKernelSpec,
     INotebook,
     INotebookCompletion,
-    INotebookExecutionLogger,
     INotebookServer,
     InterruptResult
 } from '../../types';
@@ -99,10 +98,6 @@ export class GuestJupyterNotebook
     public setLaunchingFile(_directory: string): Promise<void> {
         // Ignore this command on this side
         return Promise.resolve();
-    }
-
-    public addLogger(_logger: INotebookExecutionLogger): void {
-        noop();
     }
 
     public async setMatplotLibStyle(_useDark: boolean): Promise<void> {
