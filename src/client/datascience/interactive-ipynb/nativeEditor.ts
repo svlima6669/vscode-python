@@ -21,10 +21,11 @@ import { IInterpreterService } from '../../interpreter/contracts';
 import { captureTelemetry, sendTelemetryEvent } from '../../telemetry';
 import { concatMultilineStringInput, splitMultilineString } from '../common';
 import { EditorContexts, Identifiers, NativeKeyboardCommandTelemetryLookup, NativeMouseCommandTelemetryLookup, Telemetry } from '../constants';
+import { DataScience } from '../datascience';
 import { InteractiveBase } from '../interactive-common/interactiveBase';
 import { IEditCell, IInsertCell, INativeCommand, InteractiveWindowMessages, IRemoveCell, ISaveAll, ISubmitNewCell, ISwapCells } from '../interactive-common/interactiveWindowTypes';
 import { InvalidNotebookFileError } from '../jupyter/invalidNotebookFileError';
-import { CellState, ICell, ICodeCssGenerator, IDataScienceErrorHandler, IDataViewerProvider, IInteractiveWindowInfo, IInteractiveWindowListener, IJupyterDebugger, IJupyterExecution, IJupyterVariables, INotebookEditor, INotebookEditorProvider, INotebookExporter, INotebookImporter, INotebookServerOptions, IStatusProvider, IThemeFinder } from '../types';
+import { CellState, ICell, ICodeCssGenerator, IDataScience, IDataScienceErrorHandler, IDataViewerProvider, IInteractiveWindowInfo, IInteractiveWindowListener, IJupyterDebugger, IJupyterExecution, IJupyterVariables, INotebookEditor, INotebookEditorProvider, INotebookExporter, INotebookImporter, INotebookServerOptions, IStatusProvider, IThemeFinder } from '../types';
 
 const nativeEditorDir = path.join(EXTENSION_ROOT_DIR, 'out', 'datascience-ui', 'native-editor');
 enum AskForSaveResult {
@@ -72,6 +73,7 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
         @inject(IJupyterVariables) jupyterVariables: IJupyterVariables,
         @inject(IJupyterDebugger) jupyterDebugger: IJupyterDebugger,
         @inject(INotebookImporter) private importer: INotebookImporter,
+        @inject(IDataScience) dataScience: DataScience,
         @inject(IDataScienceErrorHandler) errorHandler: IDataScienceErrorHandler,
         @inject(IMemento) @named(GLOBAL_MEMENTO) private globalStorage: Memento,
         @inject(IMemento) @named(WORKSPACE_MEMENTO) private localStorage: Memento
@@ -96,6 +98,7 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
             jupyterVariables,
             jupyterDebugger,
             editorProvider,
+            dataScience,
             errorHandler,
             nativeEditorDir,
             [path.join(nativeEditorDir, 'index_bundle.js')],
@@ -788,7 +791,7 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
             tempFile = await this.fileSystem.createTemporaryFile('.ipynb');
 
             // Translate the cells into a notebook
-            await this.fileSystem.writeFile(tempFile.filePath, await this.generateNotebookContent(cells));
+            await this.fileSystem.writeFile(tempFile.filePath, await this.generateNotebookContent(cells), { encoding: 'utf-8' });
 
             // Import this file and show it
             const contents = await this.importer.importFromFile(tempFile.filePath, this.file.fsPath);

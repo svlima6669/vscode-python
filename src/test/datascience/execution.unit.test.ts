@@ -13,7 +13,7 @@ import { anyString, anything, deepEqual, instance, match, mock, reset, verify, w
 import { Matcher } from 'ts-mockito/lib/matcher/type/Matcher';
 import * as TypeMoq from 'typemoq';
 import * as uuid from 'uuid/v4';
-import { CancellationToken, CancellationTokenSource, ConfigurationChangeEvent, Disposable, EventEmitter, Uri } from 'vscode';
+import { CancellationToken, CancellationTokenSource, ConfigurationChangeEvent, Disposable, Event, EventEmitter, Uri } from 'vscode';
 import { ApplicationShell } from '../../client/common/application/applicationShell';
 import { IApplicationShell, IWorkspaceService } from '../../client/common/application/types';
 import { WorkspaceService } from '../../client/common/application/workspace';
@@ -63,12 +63,14 @@ import { IInterpreterService, InterpreterType, PythonInterpreter } from '../../c
 import { InterpreterService } from '../../client/interpreter/interpreterService';
 import { KnownSearchPathsForInterpreters } from '../../client/interpreter/locators/services/KnownPathsService';
 import { ServiceContainer } from '../../client/ioc/container';
+import { ServerStatus } from '../../datascience-ui/interactive-common/mainState';
 import { getOSType, OSType } from '../common';
 import { noop, sleep } from '../core';
+import { MockOutputChannel } from '../mockClasses';
 import { MockAutoSelectionService } from '../mocks/autoSelector';
 
 class MockJupyterNotebook implements INotebook {
-
+    private onStatusChangedEvent: EventEmitter<ServerStatus> | undefined;
     constructor(private owner: INotebookServer) {
         noop();
     }
@@ -120,6 +122,9 @@ class MockJupyterNotebook implements INotebook {
     }
 
     public async dispose(): Promise<void> {
+        if (this.onStatusChangedEvent) {
+            this.onStatusChangedEvent.dispose();
+        }
         return Promise.resolve();
     }
 
@@ -127,8 +132,23 @@ class MockJupyterNotebook implements INotebook {
         return;
     }
 
+    public setInterpreter(_inter: PythonInterpreter) {
+        noop();
+    }
+
     public getKernelSpec(): IJupyterKernelSpec | undefined {
         return;
+    }
+
+    public setKernelSpec(_spec: IJupyterKernelSpec): Promise<void> {
+        return Promise.resolve();
+    }
+
+    public get onSessionStatusChanged(): Event<ServerStatus> {
+        if (!this.onStatusChangedEvent) {
+            this.onStatusChangedEvent = new EventEmitter<ServerStatus>();
+        }
+        return this.onStatusChangedEvent.event;
     }
 }
 
@@ -184,7 +204,6 @@ class MockJupyterServer implements INotebookServer {
             this.notebookFile.dispose(); // This destroy any unwanted kernel specs if necessary
             this.notebookFile = undefined;
         }
-
     }
 }
 
@@ -213,6 +232,7 @@ class DisposableRegistry implements IDisposableRegistry, IAsyncDisposableRegistr
 
 suite('Jupyter Execution', async () => {
     const interpreterService = mock(InterpreterService);
+    const jupyterOutputChannel = new MockOutputChannel('');
     const executionFactory = mock(PythonExecutionFactory);
     const liveShare = mock(LiveShareApi);
     const configService = mock(ConfigurationService);
@@ -633,7 +653,8 @@ suite('Jupyter Execution', async () => {
             jupyterLaunchRetries: 3,
             enabled: true,
             jupyterServerURI: 'local',
-            notebookFileRoot: 'WORKSPACE',
+            // tslint:disable-next-line: no-invalid-template-strings
+            notebookFileRoot: '${fileDirname}',
             changeDirOnImportExport: true,
             useDefaultConfigForJupyter: true,
             jupyterInterruptTimeout: 10000,
@@ -711,7 +732,7 @@ suite('Jupyter Execution', async () => {
             path: ''
         };
         when(kernelSelector.getKernelForLocalConnection(anything(), anything(), anything())).thenResolve({ kernelSpec });
-        notebookStarter = new NotebookStarter(instance(executionFactory), commandFinder, instance(fileSystem), instance(serviceContainer), instance(interpreterService));
+        notebookStarter = new NotebookStarter(instance(executionFactory), commandFinder, instance(fileSystem), instance(serviceContainer), instance(interpreterService), instance(jupyterOutputChannel));
         when(serviceContainer.get<KernelSelector>(KernelSelector)).thenReturn(instance(kernelSelector));
         when(serviceContainer.get<NotebookStarter>(NotebookStarter)).thenReturn(notebookStarter);
         return {
@@ -727,6 +748,8 @@ suite('Jupyter Execution', async () => {
                 instance(configService),
                 instance(kernelSelector),
                 notebookStarter,
+                instance(application),
+                instance(jupyterOutputChannel),
                 instance(serviceContainer))
         };
     }

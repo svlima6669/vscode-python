@@ -8,8 +8,9 @@ import * as uuid from 'uuid/v4';
 import { Uri } from 'vscode';
 import { CancellationToken } from 'vscode-jsonrpc';
 import * as vsls from 'vsls/vscode';
-
 import { IApplicationShell, ILiveShareApi, IWorkspaceService } from '../../common/application/types';
+// tslint:disable-next-line: no-duplicate-imports
+import '../../common/extensions';
 import { IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry } from '../../common/types';
 import { IInterpreterService } from '../../interpreter/contracts';
 import { IServiceContainer } from '../../ioc/types';

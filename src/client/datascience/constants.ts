@@ -6,6 +6,8 @@ import { IS_WINDOWS } from '../common/platform/constants';
 import { NativeCommandType } from './interactive-common/interactiveWindowTypes';
 
 export const DefaultTheme = 'Default Light+';
+// Identifier for the output panel that will display the output from the Jupyter Server.
+export const JUPYTER_OUTPUT_CHANNEL = 'JUPYTER_OUTPUT_CHANNEL';
 
 // Python Module to be used when instantiating the Python Daemon.
 export const PythonDaemonModule = 'datascience.jupyter_daemon';
@@ -139,6 +141,8 @@ export enum Telemetry {
     ExpandAll = 'DATASCIENCE.EXPAND_ALL',
     CollapseAll = 'DATASCIENCE.COLLAPSE_ALL',
     SelectJupyterURI = 'DATASCIENCE.SELECT_JUPYTER_URI',
+    SelectLocalJupyterKernel = 'DATASCIENCE.SELECT_LOCAL_JUPYTER_KERNEL',
+    SelectRemoteJupyuterKernel = 'DATASCIENCE.SELECT_REMOTE_JUPYTER_KERNEL',
     SetJupyterURIToLocal = 'DATASCIENCE.SET_JUPYTER_URI_LOCAL',
     SetJupyterURIToUserSpecified = 'DATASCIENCE.SET_JUPYTER_URI_USER_SPECIFIED',
     Interrupt = 'DATASCIENCE.INTERRUPT',
@@ -151,6 +155,11 @@ export enum Telemetry {
     ConnectFailedJupyter = 'DATASCIENCE.CONNECTFAILEDJUPYTER',
     ConnectRemoteFailedJupyter = 'DATASCIENCE.CONNECTREMOTEFAILEDJUPYTER',
     ConnectRemoteSelfCertFailedJupyter = 'DATASCIENCE.CONNECTREMOTESELFCERTFAILEDJUPYTER',
+    RegisterAndUseInterpreterAsKernel = 'DATASCIENCE.REGISTER_AND_USE_INTERPRETER_AS_KERNEL',
+    UseInterpreterAsKernel = 'DATASCIENCE.USE_INTERPRETER_AS_KERNEL',
+    UseExistingKernel = 'DATASCIENCE.USE_EXISTING_KERNEL',
+    SwitchToInterpreterAsKernel = 'DATASCIENCE.SWITCH_TO_INTERPRETER_AS_KERNEL',
+    SwitchToExistingKernel = 'DATASCIENCE.SWITCH_TO_EXISTING_KERNEL',
     SelfCertsMessageEnabled = 'DATASCIENCE.SELFCERTSMESSAGEENABLED',
     SelfCertsMessageClose = 'DATASCIENCE.SELFCERTSMESSAGECLOSE',
     RemoteAddCode = 'DATASCIENCE.LIVESHARE.ADDCODE',
@@ -206,12 +215,14 @@ export enum Telemetry {
     NotebookOpenCount = 'DATASCIENCE.NATIVE.NOTEBOOK_OPEN_COUNT',
     NotebookOpenTime = 'DS_INTERNAL.NATIVE.NOTEBOOK_OPEN_TIME',
     SessionIdleTimeout = 'DATASCIENCE.JUPYTER_IDLE_TIMEOUT',
+    JupyterStartTimeout = 'DATASCIENCE.JUPYTER_START_TIMEOUT',
     NotebookExecutionActivated = 'DATASCIENCE.NOTEBOOK.EXECUTION.ACTIVATED',
     JupyterNotInstalledErrorShown = 'DATASCIENCE.JUPYTER_NOT_INSTALLED_ERROR_SHOWN',
     JupyterCommandSearch = 'DATASCIENCE.JUPYTER_COMMAND_SEARCH',
     RegisterInterpreterAsKernel = 'DATASCIENCE.JUPYTER_REGISTER_INTERPRETER_AS_KERNEL',
     UserInstalledJupyter = 'DATASCIENCE.USER_INSTALLED_JUPYTER',
-    UserDidNotInstallJupyter = 'DATASCIENCE.USER_DID_NOT_INSTALL_JUPYTER'
+    UserDidNotInstallJupyter = 'DATASCIENCE.USER_DID_NOT_INSTALL_JUPYTER',
+    OpenedInteractiveWindow = 'DATASCIENCE.OPENED_INTERACTIVE'
 }
 
 export enum NativeKeyboardCommandTelemetry {
@@ -314,6 +325,8 @@ export namespace CodeSnippits {
     export const ImportIPython = '{0}\nfrom IPython import get_ipython\n\n{1}';
     export const MatplotLibInitSvg = `import matplotlib\n%matplotlib inline\n${Identifiers.MatplotLibDefaultParams} = dict(matplotlib.rcParams)\n%config InlineBackend.figure_formats = 'svg', 'png'`;
     export const MatplotLibInitPng = `import matplotlib\n%matplotlib inline\n${Identifiers.MatplotLibDefaultParams} = dict(matplotlib.rcParams)\n%config InlineBackend.figure_formats = 'png'`;
+    export const ConfigSvg = `%config InlineBackend.figure_formats = 'svg', 'png'`;
+    export const ConfigPng = `%config InlineBackend.figure_formats = 'png'`;
 }
 
 export enum JupyterCommands {

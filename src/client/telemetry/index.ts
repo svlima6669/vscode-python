@@ -108,7 +108,7 @@ export function sendTelemetryEvent<P extends IEventNamePropertyMapping, E extend
                 // Else nothign will be sent.
                 // tslint:disable-next-line:prefer-type-cast no-any  no-unsafe-any
                 (customProperties as any)[prop] = typeof data[prop] === 'string' ? data[prop] : data[prop].toString();
-            } catch (ex){
+            } catch (ex) {
                 traceError(`Failed to serialize ${prop} for ${eventName}`, ex);
             }
         });
@@ -122,10 +122,10 @@ export function sendTelemetryEvent<P extends IEventNamePropertyMapping, E extend
 // tslint:disable-next-line:no-any function-name
 export function captureTelemetry<P extends IEventNamePropertyMapping, E extends keyof P>(eventName: E, properties?: P[E], captureDuration: boolean = true, failureEventName?: E) {
     // tslint:disable-next-line:no-function-expression no-any
-    return function(_target: Object, _propertyKey: string, descriptor: TypedPropertyDescriptor<any>) {
+    return function (_target: Object, _propertyKey: string, descriptor: TypedPropertyDescriptor<any>) {
         const originalMethod = descriptor.value;
         // tslint:disable-next-line:no-function-expression no-any
-        descriptor.value = function(...args: any[]) {
+        descriptor.value = function (...args: any[]) {
             if (!captureDuration) {
                 sendTelemetryEvent(eventName, undefined, properties);
                 // tslint:disable-next-line:no-invalid-this
@@ -1405,6 +1405,11 @@ export interface IEventNamePropertyMapping {
     [Telemetry.ConnectRemoteJupyter]: never | undefined;
     [Telemetry.ConnectRemoteFailedJupyter]: never | undefined;
     [Telemetry.ConnectRemoteSelfCertFailedJupyter]: never | undefined;
+    [Telemetry.RegisterAndUseInterpreterAsKernel]: never | undefined;
+    [Telemetry.UseInterpreterAsKernel]: never | undefined;
+    [Telemetry.UseExistingKernel]: never | undefined;
+    [Telemetry.SwitchToExistingKernel]: never | undefined;
+    [Telemetry.SwitchToInterpreterAsKernel]: never | undefined;
     [Telemetry.ConvertToPythonFile]: never | undefined;
     [Telemetry.CopySourceCode]: never | undefined;
     [Telemetry.CreateNewNotebook]: never | undefined;
@@ -1437,9 +1442,9 @@ export interface IEventNamePropertyMapping {
     [Telemetry.ImportNotebook]: { scope: 'command' | 'file' };
     [Telemetry.Interrupt]: never | undefined;
     [Telemetry.InterruptJupyterTime]: never | undefined;
-    [Telemetry.NotebookRunCount]: number;
-    [Telemetry.NotebookWorkspaceCount]: number;
-    [Telemetry.NotebookOpenCount]: number;
+    [Telemetry.NotebookRunCount]: { count: number };
+    [Telemetry.NotebookWorkspaceCount]: { count: number };
+    [Telemetry.NotebookOpenCount]: { count: number };
     [Telemetry.NotebookOpenTime]: number;
     [Telemetry.PandasNotInstalled]: never | undefined;
     [Telemetry.PandasTooOld]: never | undefined;
@@ -1448,6 +1453,7 @@ export interface IEventNamePropertyMapping {
     [Telemetry.PtvsdSuccessfullyInstalled]: never | undefined;
     [Telemetry.OpenNotebook]: { scope: 'command' | 'file' };
     [Telemetry.OpenNotebookAll]: never | undefined;
+    [Telemetry.OpenedInteractiveWindow]: never | undefined;
     [Telemetry.OpenPlotViewer]: never | undefined;
     [Telemetry.Redo]: never | undefined;
     [Telemetry.RemoteAddCode]: never | undefined;
@@ -1470,6 +1476,8 @@ export interface IEventNamePropertyMapping {
     [Telemetry.SelfCertsMessageClose]: never | undefined;
     [Telemetry.SelfCertsMessageEnabled]: never | undefined;
     [Telemetry.SelectJupyterURI]: never | undefined;
+    [Telemetry.SelectLocalJupyterKernel]: never | undefined;
+    [Telemetry.SelectRemoteJupyuterKernel]: never | undefined;
     [Telemetry.SessionIdleTimeout]: never | undefined;
     [Telemetry.JupyterNotInstalledErrorShown]: never | undefined;
     [Telemetry.JupyterCommandSearch]: { where: 'activeInterpreter' | 'otherInterpreter' | 'path' | 'nowhere'; command: JupyterCommands };
@@ -1482,6 +1490,14 @@ export interface IEventNamePropertyMapping {
     [Telemetry.ShowHistoryPane]: never | undefined;
     [Telemetry.StartJupyter]: never | undefined;
     [Telemetry.StartJupyterProcess]: never | undefined;
+    [Telemetry.JupyterStartTimeout]: {
+        /**
+         * Total time spent in attempting to start and connect to jupyter before giving up.
+         *
+         * @type {number}
+         */
+        timeout: number;
+    };
     [Telemetry.SubmitCellThroughInput]: never | undefined;
     [Telemetry.Undo]: never | undefined;
     [Telemetry.VariableExplorerFetchTime]: never | undefined;

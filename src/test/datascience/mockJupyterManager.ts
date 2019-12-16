@@ -7,6 +7,7 @@ import * as fs from 'fs-extra';
 import * as os from 'os';
 import * as path from 'path';
 import { Observable } from 'rxjs/Observable';
+import * as tmp from 'tmp';
 import * as TypeMoq from 'typemoq';
 import * as uuid from 'uuid/v4';
 import { EventEmitter, Uri } from 'vscode';
@@ -49,7 +50,7 @@ export enum SupportedCommands {
     all = 0xFFFF
 }
 
-function createKernelSpecs(specs: {name: string; resourceDir: string}[]): Record<string, any> {
+function createKernelSpecs(specs: { name: string; resourceDir: string }[]): Record<string, any> {
     const models: Record<string, any> = {};
     specs.forEach(spec => {
         models[spec.name] = {
@@ -80,6 +81,7 @@ export class MockJupyterManager implements IJupyterSessionManager {
     private kernelSpecs: { name: string; dir: string }[] = [];
     private currentSession: MockJupyterSession | undefined;
     private connInfo: IConnection | undefined;
+    private cleanTemp: (() => void) | undefined;
 
     constructor(serviceManager: IServiceManager) {
         // Make our process service factory always return this item
@@ -123,6 +125,11 @@ export class MockJupyterManager implements IJupyterSessionManager {
         // Code is as follows `await this.notebook.execute(`__file__ = '${file.replace(/\\/g, '\\\\')}'`, file, line, uuid(), undefined, true);
         // Found in src\client\datascience\interactive-common\interactiveBase.ts.
         this.addCell(`%cd "${Uri.file(path.join(EXTENSION_ROOT_DIR, 'src', 'test', 'datascience')).fsPath}`);
+        // New root dir should be in the temp folder.
+        tmp.file((_e, p, _fd, cleanup) => {
+            this.addCell(`%cd "${path.dirname(p).toLowerCase()}"`);
+            this.cleanTemp = cleanup;
+        });
         this.addCell('import sys\r\nsys.version', '1.1.1.1');
         this.addCell('import sys\r\nsys.executable', 'python');
         this.addCell('import notebook\r\nnotebook.version_info', '1.1.1.1');
@@ -139,6 +146,7 @@ export class MockJupyterManager implements IJupyterSessionManager {
         this.addCell(`__file__ = '${Uri.file('bar.py').fsPath.replace(/\\/g, '\\\\')}'`);
         this.addCell(`__file__ = '${Uri.file('foo').fsPath.replace(/\\/g, '\\\\')}'`);
         this.addCell(`__file__ = '${Uri.file('test.py').fsPath.replace(/\\/g, '\\\\')}'`);
+        this.addCell('import os\nos.getcwd()', path.join(EXTENSION_ROOT_DIR));
     }
 
     public getConnInfo(): IConnection {
@@ -259,20 +267,19 @@ export class MockJupyterManager implements IJupyterSessionManager {
         });
     }
 
-    public addCell(code: string, result?: undefined | string | number | nbformat.IUnrecognizedOutput | nbformat.IExecuteResult | nbformat.IDisplayData | nbformat.IStream | nbformat.IError, mimeType?: string) {
+    public addCell(code: string, result?: undefined | string | number | nbformat.IUnrecognizedOutput | nbformat.IExecuteResult | nbformat.IDisplayData | nbformat.IStream | nbformat.IError | string[], mimeType?: string | string[]) {
         const cells = generateCells(undefined, code, Uri.file('foo.py').fsPath, 1, true, uuid());
         cells.forEach(c => {
             const cellMatcher = new CellMatcher();
             const key = cellMatcher.stripFirstMarker(concatMultilineStringInput(c.data.source)).replace(LineFeedRegEx, '').toLowerCase();
             if (c.data.cell_type === 'code') {
-                const massagedResult = this.massageCellResult(result, mimeType);
-                const data: nbformat.ICodeCell = c.data as nbformat.ICodeCell;
-                if (result) {
-                    data.outputs = [...data.outputs, massagedResult];
-                } else {
-                    data.outputs = [...data.outputs];
+                if (mimeType && Array.isArray(mimeType) && Array.isArray(result)) {
+                    for (let i = 0; i < mimeType.length; i = i + 1) {
+                        this.addCellOutput(c, result[i], mimeType[i]);
+                    }
+                } else if (!Array.isArray(result) && !Array.isArray(mimeType)) {
+                    this.addCellOutput(c, result, mimeType);
                 }
-                c.data = data;
             }
 
             // Save each in our dictionary for future use.
@@ -287,7 +294,9 @@ export class MockJupyterManager implements IJupyterSessionManager {
     }
 
     public async dispose(): Promise<void> {
-        noop();
+        if (this.cleanTemp) {
+            this.cleanTemp();
+        }
     }
 
     public async initialize(connInfo: IConnection): Promise<void> {
@@ -310,10 +319,24 @@ export class MockJupyterManager implements IJupyterSessionManager {
         return Promise.resolve([]);
     }
 
+    private addCellOutput(cell: ICell, result?: undefined | string | number | nbformat.IUnrecognizedOutput | nbformat.IExecuteResult | nbformat.IDisplayData | nbformat.IStream | nbformat.IError, mimeType?: string) {
+        const massagedResult = this.massageCellResult(result, mimeType);
+        const data: nbformat.ICodeCell = cell.data as nbformat.ICodeCell;
+        if (result) {
+            data.outputs = [...data.outputs, massagedResult];
+        } else {
+            data.outputs = [...data.outputs];
+        }
+        cell.data = data;
+    }
+
     private onConfigChanged(configService: IConfigurationService) {
         const pythonPath = configService.getSettings().pythonPath;
         if (this.activeInterpreter === undefined || pythonPath !== this.activeInterpreter.path) {
             this.activeInterpreter = this.installedInterpreters.filter(f => f.path === pythonPath)[0];
+            if (!this.activeInterpreter) {
+                this.activeInterpreter = this.installedInterpreters[0];
+            }
             this.changedInterpreterEvent.fire();
         }
     }
@@ -344,6 +367,16 @@ export class MockJupyterManager implements IJupyterSessionManager {
                 execution_count: 1,
                 data: {},
                 metadata: {}
+            };
+        } else if (mimeType && mimeType === 'clear_true') {
+            return {
+                output_type: 'clear_true'
+            };
+        } else if (mimeType && mimeType === 'stream') {
+            return {
+                output_type: 'stream',
+                text: result,
+                name: 'stdout'
             };
         } else if (typeof result === 'string') {
             const data = {};
@@ -460,7 +493,7 @@ export class MockJupyterManager implements IJupyterSessionManager {
         if ((supportedCommands & SupportedCommands.kernelspec) === SupportedCommands.kernelspec) {
             this.setupPythonServiceExec(service, 'jupyter', ['kernelspec', '--version'], () => Promise.resolve({ stdout: '1.1.1.1' }));
             this.setupPythonServiceExec(service, 'jupyter', ['kernelspec', 'list', '--json'], () => {
-                const kernels = this.kernelSpecs.map(k => ({name: k.name, resourceDir: k.dir}));
+                const kernels = this.kernelSpecs.map(k => ({ name: k.name, resourceDir: k.dir }));
                 return Promise.resolve({ stdout: JSON.stringify(createKernelSpecs(kernels)) });
             });
 
@@ -477,12 +510,12 @@ export class MockJupyterManager implements IJupyterSessionManager {
         if ((supportedCommands & SupportedCommands.ipykernel) === SupportedCommands.ipykernel) {
             // Don't mind the goofy path here. It's supposed to not find the item on your box. It's just testing the internal regex works
             this.setupProcessServiceExec(this.processService, workingPython.path, ['-m', 'jupyter', 'kernelspec', 'list', '--json'], () => {
-                const kernels = this.kernelSpecs.map(k => ({name: k.name, resourceDir: k.dir}));
+                const kernels = this.kernelSpecs.map(k => ({ name: k.name, resourceDir: k.dir }));
                 return Promise.resolve({ stdout: JSON.stringify(createKernelSpecs(kernels)) });
             });
             this.setupProcessServiceExec(this.processService, workingPython.path, ['-m', 'ipykernel', 'install', '--user', '--name', /\w+-\w+-\w+-\w+-\w+/, '--display-name', `'Python Interactive'`], () => {
                 const spec = this.addKernelSpec(workingPython.path);
-                return Promise.resolve({ stdout: JSON.stringify(createKernelSpecs([{name: 'somename', resourceDir: path.dirname(spec)}])) });
+                return Promise.resolve({ stdout: JSON.stringify(createKernelSpecs([{ name: 'somename', resourceDir: path.dirname(spec) }])) });
             });
             const getServerInfoPath = path.join(EXTENSION_ROOT_DIR, 'pythonFiles', 'datascience', 'getServerInfo.py');
             this.setupProcessServiceExec(this.processService, workingPython.path, [getServerInfoPath], () => Promise.resolve({ stdout: 'failure to get server infos' }));
@@ -491,7 +524,7 @@ export class MockJupyterManager implements IJupyterSessionManager {
             this.setupProcessServiceExecObservable(this.processService, workingPython.path, ['-m', 'jupyter', 'notebook', '--no-browser', /--notebook-dir=.*/, '--NotebookApp.iopub_data_rate_limit=10000000000.0'], [], notebookStdErr ? notebookStdErr : ['http://localhost:8888/?token=198']);
         } else if ((supportedCommands & SupportedCommands.notebook) === SupportedCommands.notebook) {
             this.setupProcessServiceExec(this.processService, workingPython.path, ['-m', 'jupyter', 'kernelspec', 'list', '--json'], () => {
-                const kernels = this.kernelSpecs.map(k => ({name: k.name, resourceDir: k.dir}));
+                const kernels = this.kernelSpecs.map(k => ({ name: k.name, resourceDir: k.dir }));
                 return Promise.resolve({ stdout: JSON.stringify(createKernelSpecs(kernels)) });
             });
             const getServerInfoPath = path.join(EXTENSION_ROOT_DIR, 'pythonFiles', 'datascience', 'getServerInfo.py');
@@ -512,7 +545,7 @@ export class MockJupyterManager implements IJupyterSessionManager {
     private setupPathProcessService(jupyterPath: string, service: MockProcessService, supportedCommands: SupportedCommands, notebookStdErr?: string[]) {
         if ((supportedCommands & SupportedCommands.kernelspec) === SupportedCommands.kernelspec) {
             this.setupProcessServiceExec(service, jupyterPath, ['kernelspec', 'list', '--json'], () => {
-                const kernels = this.kernelSpecs.map(k => ({name: k.name, resourceDir: k.dir}));
+                const kernels = this.kernelSpecs.map(k => ({ name: k.name, resourceDir: k.dir }));
                 return Promise.resolve({ stdout: JSON.stringify(createKernelSpecs(kernels)) });
             });
             this.setupProcessServiceExecObservable(service, jupyterPath, ['kernelspec', 'list', '--json'], [], []);

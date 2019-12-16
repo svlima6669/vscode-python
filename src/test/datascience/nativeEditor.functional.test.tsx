@@ -14,11 +14,10 @@ import * as sinon from 'sinon';
 import { anything, when } from 'ts-mockito';
 import * as TypeMoq from 'typemoq';
 import { Disposable, TextDocument, TextEditor, Uri, WindowState } from 'vscode';
-
 import { IApplicationShell, IDocumentManager } from '../../client/common/application/types';
-import { FileSystem } from '../../client/common/platform/fileSystem';
-import { IFileSystem, TemporaryFile } from '../../client/common/platform/types';
+import { IFileSystem } from '../../client/common/platform/types';
 import { createDeferred, sleep, waitForPromise } from '../../client/common/utils/async';
+import { createTemporaryFile } from '../../client/common/utils/fs';
 import { noop } from '../../client/common/utils/misc';
 import { Identifiers } from '../../client/datascience/constants';
 import { InteractiveWindowMessages } from '../../client/datascience/interactive-common/interactiveWindowTypes';
@@ -36,39 +35,9 @@ import { IMonacoEditorState, MonacoEditor } from '../../datascience-ui/react-com
 import { waitForCondition } from '../common';
 import { DataScienceIocContainer } from './dataScienceIocContainer';
 import { MockDocumentManager } from './mockDocumentManager';
-import {
-    addCell,
-    closeNotebook,
-    createNewEditor,
-    getNativeCellResults,
-    mountNativeWebView,
-    openEditor,
-    runMountedTest,
-    setupWebview
-} from './nativeEditorTestHelpers';
+import { addCell, closeNotebook, createNewEditor, getNativeCellResults, mountNativeWebView, openEditor, runMountedTest, setupWebview } from './nativeEditorTestHelpers';
 import { waitForUpdate } from './reactHelpers';
-import {
-    addContinuousMockData,
-    addMockData,
-    CellPosition,
-    createKeyboardEventForCell,
-    defaultDataScienceSettings,
-    escapePath,
-    findButton,
-    getLastOutputCell,
-    getNativeFocusedEditor,
-    getOutputCell,
-    injectCode,
-    isCellFocused,
-    isCellMarkdown,
-    isCellSelected,
-    srcDirectory,
-    typeCode,
-    verifyCellIndex,
-    verifyHtmlOnCell,
-    waitForMessage,
-    waitForMessageResponse
-} from './testHelpers';
+import { addContinuousMockData, addMockData, CellPosition, createKeyboardEventForCell, defaultDataScienceSettings, escapePath, findButton, getLastOutputCell, getNativeFocusedEditor, getOutputCell, injectCode, isCellFocused, isCellMarkdown, isCellSelected, srcDirectory, typeCode, verifyCellIndex, verifyHtmlOnCell, waitForMessage, waitForMessageResponse } from './testHelpers';
 
 use(chaiAsPromised);
 
@@ -152,10 +121,17 @@ for _ in range(50):
     sys.stdout.flush()
     time.sleep(0.1)
     sys.stdout.write('\\r')`;
+            const alternating = `from IPython.display import display\r\nprint('foo')\r\ndisplay('foo')\r\nprint('bar')\r\ndisplay('bar')`;
+            const alternatingResults = ['foo', 'foo' , 'bar', 'bar'];
+
+            const clearalternating = `from IPython.display import display, clear_output\r\nprint('foo')\r\ndisplay('foo')\r\nclear_output(True)\r\nprint('bar')\r\ndisplay('bar')`;
+            const clearalternatingResults = ['foo', 'foo' , '',  'bar', 'bar'];
 
             addMockData(ioc, badPanda, `pandas has no attribute 'read'`, 'text/html', 'error');
             addMockData(ioc, goodPanda, `<td>A table</td>`, 'text/html');
             addMockData(ioc, matPlotLib, matPlotLibResults, 'text/html');
+            addMockData(ioc, clearalternating, alternatingResults, ['text/plain', 'stream', 'text/plain', 'stream']);
+            addMockData(ioc, alternating, clearalternatingResults, ['text/plain', 'stream', 'clear_true', 'text/plain', 'stream']);
             const cursors = ['|', '/', '-', '\\'];
             let cursorPos = 0;
             let loops = 3;
@@ -180,6 +156,11 @@ for _ in range(50):
 
             await addCell(wrapper, ioc, spinningCursor, true);
             verifyHtmlOnCell(wrapper, 'NativeCell', '<div>', CellPosition.Last);
+
+            await addCell(wrapper, ioc, alternating, true);
+            verifyHtmlOnCell(wrapper, 'NativeCell', /.*foo.*foo.*bar.*bar/m, CellPosition.Last);
+            await addCell(wrapper, ioc, clearalternating, true);
+            verifyHtmlOnCell(wrapper, 'NativeCell', /.*bar.*bar/m, CellPosition.Last);
         }, () => { return ioc; });
 
         runMountedTest('Click buttons', async (wrapper) => {
@@ -227,6 +208,51 @@ for _ in range(50):
                 return Promise.resolve();
             });
             assert.equal(afterDelete.length, 1, `Delete should NOT remove the last cell`);
+        }, () => { return ioc; });
+
+        runMountedTest('Select Jupyter Server', async (_wrapper) => {
+            // tslint:disable-next-line: no-console
+            console.log('Test skipped until user can change jupyter server selection again');
+            // let selectorCalled = false;
+
+            // ioc.datascience.setup(ds => ds.selectJupyterURI()).returns(() => {
+            //     selectorCalled = true;
+            //     return Promise.resolve();
+            // });
+
+            // await createNewEditor(ioc);
+            // const editor = wrapper.find(NativeEditor);
+            // const kernelSelectionUI = editor.find(KernelSelection);
+            // const buttons = kernelSelectionUI.find('div');
+            // buttons!.at(1).simulate('click');
+
+            // assert.equal(selectorCalled, true, 'Server Selector should have been called');
+        }, () => { return ioc; });
+
+        runMountedTest('Select Jupyter Kernel', async (_wrapper) => {
+            // tslint:disable-next-line: no-console
+            console.log('Tests skipped, as we need better tests');
+            // let selectorCalled = false;
+
+            // ioc.datascience.setup(ds => ds.selectLocalJupyterKernel()).returns(() => {
+            //     selectorCalled = true;
+            //     const spec: KernelSpecInterpreter = {};
+            //     return Promise.resolve(spec);
+            // });
+
+            // await createNewEditor(ioc);
+            // // Create an editor so something is listening to messages
+            // await createNewEditor(ioc);
+
+            // // Add a cell into the UI and wait for it to render
+            // await addCell(wrapper, ioc, 'a=1\na');
+
+            // const editor = wrapper.find(NativeEditor);
+            // const kernelSelectionUI = editor.find(KernelSelection);
+            // const buttons = kernelSelectionUI.find('div');
+            // buttons!.at(4).simulate('click');
+
+            // assert.equal(selectorCalled, true, 'Kernel Selector should have been called');
         }, () => { return ioc; });
 
         runMountedTest('Convert to python', async (wrapper) => {
@@ -491,7 +517,10 @@ for _ in range(50):
            });
         const addedJSONFile = JSON.stringify(addedJSON, null, ' ');
 
-        let notebookFile: TemporaryFile;
+        let notebookFile: {
+            filePath: string;
+            cleanupCallback: Function;
+        };
         function initIoc() {
             ioc = new DataScienceIocContainer();
             ioc.registerDataScienceTypes();
@@ -505,8 +534,7 @@ for _ in range(50):
                 addMockData(ioc, 'c=3\nc', 3);
                 // Use a real file so we can save notebook to a file.
                 // This is used in some tests (saving).
-                const filesystem = new FileSystem();
-                notebookFile = await filesystem.createTemporaryFile('.ipynb');
+                notebookFile = await createTemporaryFile('.ipynb');
                 await fs.writeFile(notebookFile.filePath, fileContents ? fileContents : baseFile);
                 await Promise.all([waitForUpdate(wrapper, NativeEditor, 1), openEditor(ioc, fileContents ? fileContents : baseFile, notebookFile.filePath)]);
             } else {
@@ -528,7 +556,7 @@ for _ in range(50):
             }
             await ioc.dispose();
             try {
-                notebookFile.dispose();
+                notebookFile.cleanupCallback();
             } catch {
                 noop();
             }

@@ -8,18 +8,19 @@ import { Kernel } from '@jupyterlab/services';
 import { inject, injectable } from 'inversify';
 import * as path from 'path';
 import * as uuid from 'uuid/v4';
-import { CancellationToken } from 'vscode';
-import { Cancellation } from '../../../common/cancellation';
+import { CancellationToken, CancellationTokenSource } from 'vscode';
+import { Cancellation, wrapCancellationTokens } from '../../../common/cancellation';
 import { PYTHON_LANGUAGE } from '../../../common/constants';
 import '../../../common/extensions';
 import { traceDecorators, traceError, traceInfo, traceVerbose, traceWarning } from '../../../common/logger';
 import { IFileSystem } from '../../../common/platform/types';
 import { IPythonExecutionFactory } from '../../../common/process/types';
 import { IInstaller, InstallerResponse, Product, ReadWrite } from '../../../common/types';
+import { sleep } from '../../../common/utils/async';
 import { noop } from '../../../common/utils/misc';
 import { IEnvironmentActivationService } from '../../../interpreter/activation/types';
 import { IInterpreterService, PythonInterpreter } from '../../../interpreter/contracts';
-import { captureTelemetry } from '../../../telemetry';
+import { captureTelemetry, sendTelemetryEvent } from '../../../telemetry';
 import { JupyterCommands, Telemetry } from '../../constants';
 import { IJupyterKernelSpec, IJupyterSessionManager } from '../../types';
 import { JupyterCommandFinder } from '../jupyterCommandFinder';
@@ -198,6 +199,7 @@ export class KernelService {
         // If a kernelspec already exists for this, then use that.
         const found = await this.findMatchingKernelSpec(interpreter, undefined, cancelToken);
         if (found) {
+            sendTelemetryEvent(Telemetry.UseExistingKernel);
             return found;
         }
         return this.registerKernel(interpreter, cancelToken);
@@ -229,8 +231,10 @@ export class KernelService {
         const name = this.generateKernelNameForIntepreter(interpreter);
         // If ipykernel is not installed, prompt to install it.
         if (!(await this.installer.isInstalled(Product.ipykernel, interpreter))) {
-            const response = await this.installer.promptToInstall(Product.ipykernel, interpreter);
-            if (response === InstallerResponse.Installed) {
+            // If we wish to wait for installation to complete, we must provide a cancel token.
+            const token = new CancellationTokenSource();
+            const response = await this.installer.promptToInstall(Product.ipykernel, interpreter, wrapCancellationTokens(cancelToken, token.token));
+            if (response !== InstallerResponse.Installed) {
                 traceWarning(`Prompted to install ipykernel, however ipykernel not installed in the interpreter ${interpreter.path}. Response ${response}`);
                 return;
             }
@@ -250,9 +254,18 @@ export class KernelService {
             return;
         }
 
-        const kernel = await this.findMatchingKernelSpec({ display_name: interpreter.displayName, name }, undefined, cancelToken);
-        if (Cancellation.isCanceled(cancelToken)) {
-            return;
+        let kernel = await this.findMatchingKernelSpec({ display_name: interpreter.displayName, name }, undefined, cancelToken);
+        for (let counter = 0; counter < 5; counter += 1){
+            if (Cancellation.isCanceled(cancelToken)) {
+                return;
+            }
+            if (kernel){
+                break;
+            }
+            traceWarning('Waiting for 500ms for registered kernel to get detected');
+            // Wait for jupyter server to get updated with the new kernel information.
+            await sleep(500);
+            kernel = await this.findMatchingKernelSpec({ display_name: interpreter.displayName, name }, undefined, cancelToken);
         }
         if (!kernel) {
             const error = `Kernel not created with the name ${name}, display_name ${interpreter.displayName}. Output is ${output.stdout}`;
@@ -296,9 +309,10 @@ export class KernelService {
         specModel.metadata.interpreter = interpreter as any;
 
         // Update the kernel.json with our new stuff.
-        await this.fileSystem.writeFile(kernel.specFile, JSON.stringify(specModel, undefined, 2));
+        await this.fileSystem.writeFile(kernel.specFile, JSON.stringify(specModel, undefined, 2), { flag: 'w', encoding: 'utf8' });
         kernel.metadata = specModel.metadata;
 
+        sendTelemetryEvent(Telemetry.RegisterAndUseInterpreterAsKernel);
         traceInfo(`Kernel successfully registered for ${interpreter.path} with the name=${name} and spec can be found here ${kernel.specFile}`);
         return kernel;
     }

@@ -1,16 +1,12 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 'use strict';
-import '../../../common/extensions';
-
-// tslint:disable-next-line: no-require-imports
-import cloneDeep = require('lodash/cloneDeep');
 import { Observable } from 'rxjs/Observable';
 import * as vscode from 'vscode';
 import { CancellationToken } from 'vscode-jsonrpc';
 import * as vsls from 'vsls/vscode';
-
 import { IApplicationShell, ILiveShareApi, IWorkspaceService } from '../../../common/application/types';
+import '../../../common/extensions';
 import { traceError } from '../../../common/logger';
 import { IConfigurationService, IDisposableRegistry } from '../../../common/types';
 import { createDeferred } from '../../../common/utils/async';
@@ -30,6 +26,9 @@ import { LiveShareParticipantHost } from './liveShareParticipantMixin';
 import { ResponseQueue } from './responseQueue';
 import { IRoleBasedObject } from './roleBasedFactory';
 import { IExecuteObservableResponse, IResponseMapping, IServerResponse, ServerResponseType } from './types';
+
+// tslint:disable-next-line: no-require-imports
+import cloneDeep = require('lodash/cloneDeep');
 
 // tslint:disable:no-any
 

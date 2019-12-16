@@ -12,6 +12,7 @@ import { ConfigurationTarget, Event, EventEmitter, Position, Range, Selection, T
 import { Disposable } from 'vscode-jsonrpc';
 import * as vsls from 'vsls/vscode';
 
+import { ServerStatus } from '../../../datascience-ui/interactive-common/mainState';
 import {
     IApplicationShell,
     IDocumentManager,
@@ -31,8 +32,9 @@ import { IInterpreterService, PythonInterpreter } from '../../interpreter/contra
 import { captureTelemetry, sendTelemetryEvent } from '../../telemetry';
 import { generateCellRangesFromDocument } from '../cellFactory';
 import { CellMatcher } from '../cellMatcher';
-import { Identifiers, Telemetry } from '../constants';
+import { Identifiers, Settings, Telemetry } from '../constants';
 import { ColumnWarningSize } from '../data-viewing/types';
+import { DataScience } from '../datascience';
 import {
     IAddedSysInfo,
     ICopyCode,
@@ -48,6 +50,7 @@ import {
 import { JupyterInstallError } from '../jupyter/jupyterInstallError';
 import { JupyterSelfCertsError } from '../jupyter/jupyterSelfCertsError';
 import { JupyterKernelPromiseFailedError } from '../jupyter/kernels/jupyterKernelPromiseFailedError';
+import { KernelSpecInterpreter } from '../jupyter/kernels/kernelSelector';
 import { CssMessages } from '../messages';
 import {
     CellState,
@@ -110,6 +113,7 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
         @unmanaged() private jupyterVariables: IJupyterVariables,
         @unmanaged() private jupyterDebugger: IJupyterDebugger,
         @unmanaged() protected ipynbProvider: INotebookEditorProvider,
+        @unmanaged() private dataScience: DataScience,
         @unmanaged() protected errorHandler: IDataScienceErrorHandler,
         @unmanaged() rootPath: string,
         @unmanaged() scripts: string[],
@@ -259,6 +263,14 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
 
             case InteractiveWindowMessages.LoadOnigasmAssemblyRequest:
                 this.handleMessage(message, payload, this.requestOnigasm);
+                break;
+
+            case InteractiveWindowMessages.SelectKernel:
+                this.handleMessage(message, payload, this.selectKernel);
+                break;
+
+            case InteractiveWindowMessages.SelectJupyterServer:
+                this.handleMessage(message, payload, this.selectServer);
                 break;
 
             default:
@@ -634,7 +646,7 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
             try {
                 // tslint:disable-next-line: no-any
                 const contents = JSON.stringify(notebook);
-                await this.fileSystem.writeFile(file, contents);
+                await this.fileSystem.writeFile(file, contents, { encoding: 'utf8', flag: 'w' });
                 const openQuestion1 = localize.DataScience.exportOpenQuestion1();
                 const openQuestion2 = (await this.jupyterExecution.isSpawnSupported()) ? localize.DataScience.exportOpenQuestion() : undefined;
                 this.showInformationMessage(localize.DataScience.exportDialogComplete().format(file), openQuestion1, openQuestion2).then(async (str: string | undefined) => {
@@ -778,23 +790,6 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
         }
     }
 
-    private async checkPandas(): Promise<boolean> {
-        const pandasVersion = this.notebook ? await this.dataExplorerProvider.getPandasVersion(this.notebook) : undefined;
-        if (!pandasVersion) {
-            sendTelemetryEvent(Telemetry.PandasNotInstalled);
-            // Warn user that there is no pandas.
-            this.applicationShell.showErrorMessage(localize.DataScience.pandasRequiredForViewing());
-            return false;
-        } else if (pandasVersion.major < 1 && pandasVersion.minor < 20) {
-            sendTelemetryEvent(Telemetry.PandasTooOld);
-            // Warn user that we cannot start because pandas is too old.
-            const versionStr = `${pandasVersion.major}.${pandasVersion.minor}.${pandasVersion.build}`;
-            this.applicationShell.showErrorMessage(localize.DataScience.pandasTooOldForViewingFormat().format(versionStr));
-            return false;
-        }
-        return true;
-    }
-
     private shouldAskForLargeData(): boolean {
         const settings = this.configuration.getSettings();
         return settings && settings.datascience && settings.datascience.askForLargeDataFrames === true;
@@ -826,7 +821,7 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
 
     private async showDataViewer(request: IShowDataViewer): Promise<void> {
         try {
-            if (await this.checkPandas() && await this.checkColumnSize(request.columnSize)) {
+            if (await this.checkColumnSize(request.columnSize)) {
                 await this.dataExplorerProvider.create(request.variableName, this.notebook!);
             }
         } catch (e) {
@@ -1068,6 +1063,25 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
         if (this.notebook) {
             const uri: Uri = await this.getNotebookIdentity();
             this.postMessage(InteractiveWindowMessages.NotebookExecutionActivated, uri.toString()).ignoreErrors();
+
+            const statusChangeHandler = async (status: ServerStatus) => {
+                if (this.notebook) {
+                    const settings = this.configuration.getSettings();
+                    const kernelSpec = this.notebook.getKernelSpec();
+
+                    if (kernelSpec) {
+                        const name = kernelSpec.display_name;
+
+                        await this.postMessage(InteractiveWindowMessages.UpdateKernel, {
+                            jupyterServerStatus: status,
+                            localizedUri: settings.datascience.jupyterServerURI.toLowerCase() === Settings.JupyterServerLocalLaunch ?
+                                localize.DataScience.localJupyterServer() : settings.datascience.jupyterServerURI,
+                            displayName: name
+                        });
+                    }
+                }
+            };
+            this.notebook.onSessionStatusChanged(statusChangeHandler);
         }
 
         traceInfo('Connected to jupyter server.');
@@ -1263,6 +1277,38 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
             // This happens during testing. Onigasm not needed as we're not testing colorization.
             traceWarning('File system not found. Colorization will not be available.');
             this.postMessage(InteractiveWindowMessages.LoadOnigasmAssemblyResponse, undefined).ignoreErrors();
+        }
+    }
+
+    private async selectServer() {
+        await this.dataScience.selectJupyterURI();
+    }
+
+    private async selectKernel() {
+        const settings = this.configuration.getSettings();
+
+        let kernel: KernelSpecInterpreter | undefined;
+
+        if (settings.datascience.jupyterServerURI.toLowerCase() === Settings.JupyterServerLocalLaunch) {
+            kernel = await this.dataScience.selectLocalJupyterKernel();
+        } else if (this.notebook) {
+            const connInfo = this.notebook.server.getConnectionInfo();
+
+            if (connInfo) {
+                kernel = await this.dataScience.selectRemoteJupyterKernel(connInfo);
+            }
+        }
+
+        if (kernel && kernel.kernelSpec && this.notebook) {
+            if (kernel.interpreter) {
+                this.notebook.setInterpreter(kernel.interpreter);
+            }
+
+            // Change the kernel. A status update should fire that changes our display
+            await this.notebook.setKernelSpec(kernel.kernelSpec);
+
+            // Add in a new sys info
+            await this.addSysInfo(SysInfoReason.New);
         }
     }
 }

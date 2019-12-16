@@ -3,10 +3,9 @@
 
 'use strict';
 
+import * as fs from 'fs';
 import * as path from 'path';
 import { EXTENSION_ROOT_DIR } from '../../constants';
-import { FileSystem } from '../platform/fileSystem';
-import { IFileSystem } from '../platform/types';
 
 // External callers of localize use these tables to retrieve localized values.
 export namespace Diagnostics {
@@ -23,6 +22,7 @@ export namespace Diagnostics {
     export const yesUpdateLaunch = localize('diagnostics.yesUpdateLaunch', 'Yes, update launch.json');
     export const invalidTestSettings = localize('diagnostics.invalidTestSettings', 'Your settings needs to be updated to change the setting "python.unitTest." to "python.testing.", otherwise testing Python code using the extension may not work. Would you like to automatically update your settings now?');
     export const updateSettings = localize('diagnostics.updateSettings', 'Yes, update settings');
+    export const processId = localize('diagnostics.processId', 'Attaching the debugger to a local process is an experimental feature. It will be available to all users soon.');
 }
 
 export namespace Common {
@@ -83,6 +83,7 @@ export namespace OutputChannelNames {
     export const languageServer = localize('OutputChannelNames.languageServer', 'Python Language Server');
     export const python = localize('OutputChannelNames.python', 'Python');
     export const pythonTest = localize('OutputChannelNames.pythonTest', 'Python Test Log');
+    export const jupyter = localize('OutputChannelNames.jupyter', 'Jupyter');
 }
 
 export namespace Logging {
@@ -110,6 +111,10 @@ export namespace DataScienceSurveyBanner {
 export namespace ExtensionSurveyBanner {
     export const bannerMessage = localize('ExtensionSurveyBanner.bannerMessage', 'Can you please take 2 minutes to tell us how the Python extension is working for you?');
     export const maybeLater = localize('ExtensionSurveyBanner.maybeLater', 'Maybe later');
+}
+
+export namespace Products {
+    export const installingModule = localize('products.installingModule', 'Installing {0}');
 }
 
 export namespace DataScience {
@@ -220,6 +225,10 @@ export namespace DataScience {
     export const loadingMessage = localize('DataScience.loadingMessage', 'loading ...');
     export const fetchingDataViewer = localize('DataScience.fetchingDataViewer', 'Fetching data ...');
     export const noRowsInDataViewer = localize('DataScience.noRowsInDataViewer', 'No rows match current filter');
+    export const jupyterServer = localize('DataScience.jupyterServer', 'Jupyter Server');
+    export const noKernel = localize('DataScience.noKernel', 'No Kernel');
+    export const selectKernel = localize('DataScience.selectKernel', 'Select a Kernel');
+    export const localJupyterServer = localize('DataScience.localJupyterServer', 'local');
     export const pandasTooOldForViewingFormat = localize('DataScience.pandasTooOldForViewingFormat', 'Python package \'pandas\' is version {0}. Version 0.20 or greater is required for viewing data.');
     export const pandasRequiredForViewing = localize('DataScience.pandasRequiredForViewing', 'Python package \'pandas\' is required for viewing data.');
     export const valuesColumn = localize('DataScience.valuesColumn', 'values');
@@ -305,8 +314,8 @@ export namespace DataScience {
     export const savePngTitle = localize('DataScience.savePngTitle', 'Save Image');
     export const fallbackToUseActiveInterpeterAsKernel = localize('DataScience.fallbackToUseActiveInterpeterAsKernel', 'Couldn\'t find kernel \'{0}\' that the notebook was created with. Using the current interpreter.');
     export const fallBackToRegisterAndUseActiveInterpeterAsKernel = localize('DataScience.fallBackToRegisterAndUseActiveInterpeterAsKernel', 'Couldn\'t find kernel \'{0}\' that the notebook was created with. Registering a new kernel using the current interpreter.');
-    export const kernelDescriptionForKernelPicker = localize('DataScience.kernelDescriptionForKernelPicker', '(kernel)');
     export const fallBackToPromptToUseActiveInterpreterOrSelectAKernel = localize('DataScience.fallBackToPromptToUseActiveInterpreterOrSelectAKernel', 'Couldn\'t find kernel \'{0}\' that the notebook was created with.');
+    export const jupyterStartTimedout = localize('DataScience.jupyterStartTimedout', 'Starting Jupyter has timedout. Please check the \'Jupyter\' output panel for further details.');
 }
 
 export namespace DebugConfigStrings {
@@ -494,15 +503,14 @@ function getString(key: string, defValue?: string) {
     return result;
 }
 
-function load(fs?: IFileSystem) {
-    fs = fs ? fs : new FileSystem();
+function load() {
     // Figure out our current locale.
     loadedLocale = parseLocale();
 
     // Find the nls file that matches (if there is one)
     const nlsFile = path.join(EXTENSION_ROOT_DIR, `package.nls.${loadedLocale}.json`);
-    if (fs.fileExistsSync(nlsFile)) {
-        const contents = fs.readFileSync(nlsFile);
+    if (fs.existsSync(nlsFile)) {
+        const contents = fs.readFileSync(nlsFile, 'utf8');
         loadedCollection = JSON.parse(contents);
     } else {
         // If there isn't one, at least remember that we looked so we don't try to load a second time
@@ -512,8 +520,8 @@ function load(fs?: IFileSystem) {
     // Get the default collection if necessary. Strings may be in the default or the locale json
     if (!defaultCollection) {
         const defaultNlsFile = path.join(EXTENSION_ROOT_DIR, 'package.nls.json');
-        if (fs.fileExistsSync(defaultNlsFile)) {
-            const contents = fs.readFileSync(defaultNlsFile);
+        if (fs.existsSync(defaultNlsFile)) {
+            const contents = fs.readFileSync(defaultNlsFile, 'utf8');
             defaultCollection = JSON.parse(contents);
         } else {
             defaultCollection = {};

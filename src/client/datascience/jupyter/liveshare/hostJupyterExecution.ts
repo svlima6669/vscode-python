@@ -6,9 +6,9 @@ import '../../../common/extensions';
 import { CancellationToken } from 'vscode';
 import * as vsls from 'vsls/vscode';
 
-import { ILiveShareApi, IWorkspaceService } from '../../../common/application/types';
+import { IApplicationShell, ILiveShareApi, IWorkspaceService } from '../../../common/application/types';
 import { IFileSystem } from '../../../common/platform/types';
-import { IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry, ILogger } from '../../../common/types';
+import { IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry, ILogger, IOutputChannel } from '../../../common/types';
 import { noop } from '../../../common/utils/misc';
 import { IInterpreterService } from '../../../interpreter/contracts';
 import { IServiceContainer } from '../../../ioc/types';
@@ -44,6 +44,8 @@ export class HostJupyterExecution
         configService: IConfigurationService,
         kernelSelector: KernelSelector,
         notebookStarter: NotebookStarter,
+        appShell: IApplicationShell,
+        jupyterOutputChannel: IOutputChannel,
         serviceContainer: IServiceContainer) {
         super(
             liveShare,
@@ -54,6 +56,8 @@ export class HostJupyterExecution
             configService,
             kernelSelector,
             notebookStarter,
+            appShell,
+            jupyterOutputChannel,
             serviceContainer);
         this.serverCache = new ServerCache(configService, workspace, fileSys);
         asyncRegistry.push(this);
@@ -70,21 +74,12 @@ export class HostJupyterExecution
         }
     }
 
-    public async connectToNotebookServer(options?: INotebookServerOptions, cancelToken?: CancellationToken): Promise<INotebookServer | undefined> {
-        // See if we have this server in our cache already or not
-        let result = await this.serverCache.get(options);
-        if (result) {
-            return result;
-        } else {
-            // Create the server
-            result = await super.connectToNotebookServer(await this.serverCache.generateDefaultOptions(options), cancelToken);
+    public async hostConnectToNotebookServer(options?: INotebookServerOptions, cancelToken?: CancellationToken): Promise<INotebookServer | undefined> {
+        return super.connectToNotebookServer(await this.serverCache.generateDefaultOptions(options), cancelToken);
+    }
 
-            // Save in our cache
-            if (result) {
-                await this.serverCache.set(result, noop, options);
-            }
-            return result;
-        }
+    public async connectToNotebookServer(options?: INotebookServerOptions, cancelToken?: CancellationToken): Promise<INotebookServer | undefined> {
+        return this.serverCache.getOrCreate(this.hostConnectToNotebookServer.bind(this), options, cancelToken);
     }
 
     public async onAttach(api: vsls.LiveShare | null): Promise<void> {

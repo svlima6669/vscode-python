@@ -227,8 +227,7 @@ suite('DataScience notebook tests', () => {
     async function createNotebook(useDefaultConfig: boolean, expectFailure?: boolean, usingDarkTheme?: boolean, purpose?: string): Promise<INotebook | undefined> {
         // Catch exceptions. Throw a specific assertion if the promise fails
         try {
-            const testDir = path.join(EXTENSION_ROOT_DIR, 'src', 'test', 'datascience');
-            const server = await jupyterExecution.connectToNotebookServer({ usingDarkTheme, useDefaultConfig, workingDir: testDir, purpose: purpose ? purpose : '1' });
+            const server = await jupyterExecution.connectToNotebookServer({ usingDarkTheme, useDefaultConfig, workingDir: ioc.getSettings().datascience.notebookFileRoot, purpose: purpose ? purpose : '1' });
             if (expectFailure) {
                 assert.ok(false, `Expected server to not be created`);
             }
@@ -486,6 +485,12 @@ suite('DataScience notebook tests', () => {
         const cells = testState.cellVMs.map((cellVM: ICellViewModel, _index: number) => { return cellVM.cell; });
 
         // Translate this into a notebook
+
+        // Make sure we have a change dir happening
+        const settings = { ...ioc.getSettings().datascience };
+        settings.changeDirOnImportExport = true;
+        ioc.forceSettingsChanged(ioc.getSettings().pythonPath, settings);
+
         const exporter = ioc.serviceManager.get<INotebookExporter>(INotebookExporter);
         const newFolderPath = path.join(EXTENSION_ROOT_DIR, 'src', 'test', 'datascience', 'WorkspaceDir', 'WorkspaceSubDir', 'foo.ipynb');
         const notebook = await exporter.translateToNotebook(cells, newFolderPath);
@@ -524,6 +529,11 @@ suite('DataScience notebook tests', () => {
             importer.dispose();
             temp.dispose();
         }
+    });
+
+    runTest('Verify path', async () => {
+        const notebook = await createNotebook(true);
+        await verifySimple(notebook, 'import os\nos.getcwd()', EXTENSION_ROOT_DIR);
     });
 
     runTest('Change Interpreter', async () => {
@@ -605,9 +615,7 @@ suite('DataScience notebook tests', () => {
 
     async function testCancelableCall<T>(method: (t: CancellationToken) => Promise<T>, messageFormat: string, timeout: number): Promise<boolean> {
         const tokenSource = new TaggedCancellationTokenSource(messageFormat.format(timeout.toString()));
-        let canceled = false;
         const disp = setTimeout((_s) => {
-            canceled = true;
             tokenSource.cancel();
         }, timeout, tokenSource.tag);
 
@@ -615,8 +623,6 @@ suite('DataScience notebook tests', () => {
             // tslint:disable-next-line:no-string-literal
             (tokenSource.token as any)['tag'] = messageFormat.format(timeout.toString());
             await method(tokenSource.token);
-            // We might get here before the cancel finishes
-            assert.ok(!canceled, messageFormat.format(timeout.toString()));
         } catch (exc) {
             // This should happen. This means it was canceled.
             assert.ok(exc instanceof CancellationError, `Non cancellation error found : ${exc.stack}`);
@@ -629,7 +635,7 @@ suite('DataScience notebook tests', () => {
     }
 
     async function testCancelableMethod<T>(method: (t: CancellationToken) => Promise<T>, messageFormat: string, short?: boolean): Promise<boolean> {
-        const timeouts = short ? [10, 20, 30, 100] : [100, 200, 300, 1000];
+        const timeouts = short ? [10, 20, 30, 100] : [300, 400, 500, 1000];
         // tslint:disable-next-line:prefer-for-of
         for (let i = 0; i < timeouts.length; i += 1) {
             await testCancelableCall(method, messageFormat, timeouts[i]);
@@ -1094,9 +1100,9 @@ plt.show()`,
         const server = await createNotebook(true);
         assert.ok(server, 'Server not created in logging case');
         await server!.execute(`a=1${os.EOL}a`, path.join(srcDirectory(), 'foo.py'), 2, uuid());
-        assert.equal(cellInputs.length, 3, 'Not enough cell inputs');
+        assert.equal(cellInputs.length, 2, 'Not enough cell inputs');
         assert.ok(outputs.length >= 1, 'Not enough cell outputs');
-        assert.equal(cellInputs[2], 'a=1\na', 'Cell inputs not captured');
+        assert.equal(cellInputs[1], 'a=1\na', 'Cell inputs not captured');
         assert.equal(outputs[outputs.length - 1], '1', 'Cell outputs not captured');
     });
 
@@ -1126,7 +1132,7 @@ plt.show()`,
             this.skip();
         } else {
             const application = mock(ApplicationShell);
-            when(application.withProgress(anything(), anything())).thenResolve({status: ModuleExistsStatus.NotFound} as any);
+            when(application.withProgress(anything(), anything())).thenResolve({ status: ModuleExistsStatus.NotFound } as any);
             ioc.serviceManager.rebindInstance<IApplicationShell>(IApplicationShell, instance(application));
 
             jupyterExecution = ioc.serviceManager.get<IJupyterExecution>(IJupyterExecution);
