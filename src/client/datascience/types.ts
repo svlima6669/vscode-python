@@ -103,6 +103,7 @@ export interface INotebook extends IAsyncDisposable {
     getKernelSpec(): IJupyterKernelSpec | undefined;
     setKernelSpec(spec: IJupyterKernelSpec): Promise<void>;
     setInterpreter(interpeter: PythonInterpreter): void;
+    getGatherService(): IGatherExecution | undefined;
 }
 
 export interface INotebookServerOptions {
@@ -130,7 +131,7 @@ export interface IGatherExecution {
 }
 
 export const IGatherLogger = Symbol('IGatherLogger');
-export interface IGatherLogger {
+export interface IGatherLogger extends INotebookExecutionLogger {
     service(): IGatherExecution;
 }
 

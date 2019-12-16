@@ -25,7 +25,7 @@ import { generateCells } from '../cellFactory';
 import { CellMatcher } from '../cellMatcher';
 import { concatMultilineStringInput, concatMultilineStringOutput, formatStreamText } from '../common';
 import { CodeSnippits, Identifiers, Telemetry } from '../constants';
-import { CellState, ICell, IJupyterKernelSpec, IJupyterSession, INotebook, INotebookCompletion, INotebookExecutionLogger, INotebookServer, INotebookServerLaunchInfo, InterruptResult } from '../types';
+import { CellState, ICell, IGatherExecution, IGatherLogger, IJupyterKernelSpec, IJupyterSession, INotebook, INotebookCompletion, INotebookExecutionLogger, INotebookServer, INotebookServerLaunchInfo, InterruptResult } from '../types';
 import { expandWorkingDir } from './jupyterUtils';
 
 // tslint:disable-next-line: no-require-imports
@@ -510,6 +510,11 @@ export class JupyterNotebookBase implements INotebook {
             // Rerun our initial setup
             await this.initialize();
         }
+    }
+
+    public getGatherService(): IGatherExecution | undefined {
+        const gatherLogger: INotebookExecutionLogger | undefined = this._loggers.find((logger: INotebookExecutionLogger) => { return (<IGatherLogger>logger).service !== undefined; });
+        return gatherLogger ? (<IGatherLogger>gatherLogger).service() : undefined;
     }
 
     private async initializeMatplotlib(cancelToken?: CancellationToken): Promise<void> {

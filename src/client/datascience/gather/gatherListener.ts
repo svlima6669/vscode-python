@@ -10,19 +10,22 @@ import { noop } from '../../common/utils/misc';
 import { generateCellsFromString } from '../cellFactory';
 import { Identifiers } from '../constants';
 import { IInteractiveWindowMapping, InteractiveWindowMessages } from '../interactive-common/interactiveWindowTypes';
-import { ICell, IGatherLogger, IInteractiveWindowListener, INotebookEditorProvider, INotebookExporter } from '../types';
+import { ICell, IGatherExecution, IInteractiveWindowListener, IInteractiveWindowProvider, IJupyterExecution, INotebook, INotebookEditorProvider, INotebookExporter } from '../types';
 
 @injectable()
 export class GatherListener implements IInteractiveWindowListener {
     // tslint:disable-next-line: no-any
     private postEmitter: EventEmitter<{ message: string; payload: any }> = new EventEmitter<{ message: string; payload: any }>();
     private notebookUri: Uri | undefined;
+    private gatherService: IGatherExecution | undefined;
 
     constructor(
         @inject(IApplicationShell) private applicationShell: IApplicationShell,
         @inject(INotebookExporter) private jupyterExporter: INotebookExporter,
         @inject(INotebookEditorProvider) private ipynbProvider: INotebookEditorProvider,
         @inject(IConfigurationService) private configService: IConfigurationService,
+        @inject(IJupyterExecution) private jupyterExecution: IJupyterExecution,
+        @inject(IInteractiveWindowProvider) private interactiveWindowProvider: IInteractiveWindowProvider,
         @inject(IDocumentManager) private documentManager: IDocumentManager,
         @inject(IFileSystem) private fileSystem: IFileSystem
     ) {
@@ -40,12 +43,18 @@ export class GatherListener implements IInteractiveWindowListener {
     // tslint:disable-next-line: no-any
     public onMessage(message: string, payload?: any): void {
         switch (message) {
+            case InteractiveWindowMessages.NotebookExecutionActivated:
+                this.handleMessage(message, payload, this.doInitGather);
+                break;
+
             case InteractiveWindowMessages.GatherCodeRequest:
                 this.handleMessage(message, payload, this.doGather);
                 break;
 
             case InteractiveWindowMessages.RestartKernel:
-                this.gatherLogger.service().resetLog();
+                if (this.gatherService) {
+                    this.gatherService.resetLog();
+                }
                 break;
 
             default:
@@ -65,8 +74,30 @@ export class GatherListener implements IInteractiveWindowListener {
         });
     }
 
+    private doInitGather(payload: string): void {
+        this.initGather(payload).ignoreErrors();
+    }
+
+    private async initGather(notebookUri: string) {
+        this.notebookUri = Uri.parse(notebookUri);
+
+        // First get the active server
+        const activeServer = await this.jupyterExecution.getServer(await this.interactiveWindowProvider.getNotebookOptions());
+
+        let nb: INotebook | undefined;
+        // If that works, see if there's a matching notebook running
+        if (activeServer) {
+            nb = await activeServer.getNotebook(this.notebookUri);
+
+            // If we have an executing notebook, get its gather execution service.
+            if (nb) {
+                this.gatherService = nb.getGatherService();
+            }
+        }
+    }
+
     private gatherCodeInternal = async (cell: ICell) => {
-        const slicedProgram = this.gatherLogger.service().gatherCode(cell);
+        const slicedProgram = (this.gatherService) ? this.gatherService.gatherCode(cell) : '';
 
         if (this.configService.getSettings().datascience.gatherToScript) {
             await this.showFile(slicedProgram, cell.file);

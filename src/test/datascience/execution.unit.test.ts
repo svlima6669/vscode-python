@@ -50,6 +50,7 @@ import { NotebookStarter } from '../../client/datascience/jupyter/notebookStarte
 import {
     ICell,
     IConnection,
+    IGatherExecution,
     IJupyterKernelSpec,
     INotebook,
     INotebookCompletion,
@@ -142,6 +143,10 @@ class MockJupyterNotebook implements INotebook {
 
     public setKernelSpec(_spec: IJupyterKernelSpec): Promise<void> {
         return Promise.resolve();
+    }
+
+    public getGatherService(): IGatherExecution | undefined {
+        return;
     }
 
     public get onSessionStatusChanged(): Event<ServerStatus> {
