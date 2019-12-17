@@ -8,7 +8,7 @@ import { injectable, unmanaged } from 'inversify';
 import * as os from 'os';
 import * as path from 'path';
 import * as uuid from 'uuid/v4';
-import { ConfigurationTarget, Event, EventEmitter, Position, Range, Selection, TextEditor, Uri, ViewColumn } from 'vscode';
+import { ConfigurationTarget, Event, EventEmitter, Position, ProgressLocation, ProgressOptions, Range, Selection, TextEditor, Uri, ViewColumn } from 'vscode';
 import { Disposable } from 'vscode-jsonrpc';
 import * as vsls from 'vsls/vscode';
 
@@ -1070,7 +1070,7 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
                     const kernelSpec = this.notebook.getKernelSpec();
 
                     if (kernelSpec) {
-                        const name = kernelSpec.display_name;
+                        const name = kernelSpec.display_name || kernelSpec.name;
 
                         await this.postMessage(InteractiveWindowMessages.UpdateKernel, {
                             jupyterServerStatus: status,
@@ -1290,25 +1290,38 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
         let kernel: KernelSpecInterpreter | undefined;
 
         if (settings.datascience.jupyterServerURI.toLowerCase() === Settings.JupyterServerLocalLaunch) {
-            kernel = await this.dataScience.selectLocalJupyterKernel();
+            kernel = await this.dataScience.selectLocalJupyterKernel(this.notebook?.getKernelSpec());
         } else if (this.notebook) {
             const connInfo = this.notebook.server.getConnectionInfo();
-
+            const currentKernel = this.notebook.getKernelSpec();
             if (connInfo) {
-                kernel = await this.dataScience.selectRemoteJupyterKernel(connInfo);
+                kernel = await this.dataScience.selectRemoteJupyterKernel(connInfo, currentKernel);
             }
         }
 
-        if (kernel && kernel.kernelSpec && this.notebook) {
-            if (kernel.interpreter) {
-                this.notebook.setInterpreter(kernel.interpreter);
-            }
+        if (kernel && (kernel.kernelSpec || kernel.kernelModel) && this.notebook) {
+            const switchKernel = async (newKernel: KernelSpecInterpreter) => {
+                if (newKernel.interpreter) {
+                    this.notebook!.setInterpreter(newKernel.interpreter);
+                }
 
-            // Change the kernel. A status update should fire that changes our display
-            await this.notebook.setKernelSpec(kernel.kernelSpec);
+                // Change the kernel. A status update should fire that changes our display
+                await this.notebook!.setKernelSpec(newKernel.kernelSpec || newKernel.kernelModel!);
 
-            // Add in a new sys info
-            await this.addSysInfo(SysInfoReason.New);
+                // Add in a new sys info
+                await this.addSysInfo(SysInfoReason.New);
+            };
+
+            const kernelDisplayName = kernel.kernelSpec?.display_name || kernel.kernelModel?.display_name;
+            const kernelName = kernel.kernelSpec?.name || kernel.kernelModel?.name;
+            // One of them is bound to be non-empty.
+            const displayName = kernelDisplayName || kernelName || '';
+            const options: ProgressOptions = {
+                location: ProgressLocation.Notification,
+                cancellable: false,
+                title: localize.DataScience.switchingKernelProgress().format(displayName)
+            };
+            await this.applicationShell.withProgress(options, async (_, __) => switchKernel(kernel!));
         }
     }
 }

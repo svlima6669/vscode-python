@@ -25,6 +25,7 @@ import { JupyterCommands, Telemetry } from '../../constants';
 import { IJupyterKernelSpec, IJupyterSessionManager } from '../../types';
 import { JupyterCommandFinder } from '../jupyterCommandFinder';
 import { JupyterKernelSpec } from './jupyterKernelSpec';
+import { LiveKernelModel } from './types';
 
 // tslint:disable-next-line: no-var-requires no-require-imports
 const NamedRegexp = require('named-js-regexp');
@@ -116,8 +117,8 @@ export class KernelService {
      * @returns {(Promise<PythonInterpreter | undefined>)}
      * @memberof KernelService
      */
-    public async findMatchingInterpreter(kernelSpec: IJupyterKernelSpec, cancelToken?: CancellationToken): Promise<PythonInterpreter | undefined> {
-        if (kernelSpec.language.toLowerCase() !== PYTHON_LANGUAGE) {
+    public async findMatchingInterpreter(kernelSpec: IJupyterKernelSpec | LiveKernelModel, cancelToken?: CancellationToken): Promise<PythonInterpreter | undefined> {
+        if (kernelSpec.language && kernelSpec.language?.toLowerCase() !== PYTHON_LANGUAGE) {
             return;
         }
         const activeInterpreterPromise = this.interpreterService.getActiveInterpreter(undefined);
@@ -255,11 +256,11 @@ export class KernelService {
         }
 
         let kernel = await this.findMatchingKernelSpec({ display_name: interpreter.displayName, name }, undefined, cancelToken);
-        for (let counter = 0; counter < 5; counter += 1){
+        for (let counter = 0; counter < 5; counter += 1) {
             if (Cancellation.isCanceled(cancelToken)) {
                 return;
             }
-            if (kernel){
+            if (kernel) {
                 break;
             }
             traceWarning('Waiting for 500ms for registered kernel to get detected');
@@ -329,7 +330,7 @@ export class KernelService {
         if (Cancellation.isCanceled(cancelToken)) {
             return [];
         }
-        const specs = await enumerator;
+        const specs: IJupyterKernelSpec[] = await enumerator;
         return specs.filter(item => !!item);
     }
     /**
