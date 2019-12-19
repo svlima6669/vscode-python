@@ -11,6 +11,7 @@ import * as vsls from 'vsls/vscode';
 import { IApplicationShell, ILiveShareApi, IWorkspaceService } from '../../common/application/types';
 // tslint:disable-next-line: no-duplicate-imports
 import '../../common/extensions';
+import { IFileSystem } from '../../common/platform/types';
 import { IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry } from '../../common/types';
 import { IInterpreterService } from '../../interpreter/contracts';
 import { IServiceContainer } from '../../ioc/types';
@@ -41,6 +42,7 @@ type JupyterServerClassType = {
         workspaceService: IWorkspaceService,
         serviceContainer: IServiceContainer,
         appShell: IApplicationShell,
+        fs: IFileSystem,
         interpreterService: IInterpreterService
     ): IJupyterServerInterface;
 };
@@ -63,7 +65,9 @@ export class JupyterServerFactory implements INotebookServer, ILiveShareHasRole 
         @inject(IWorkspaceService) workspaceService: IWorkspaceService,
         @inject(IServiceContainer) serviceContainer: IServiceContainer,
         @inject(IApplicationShell) appShell: IApplicationShell,
-        @inject(IInterpreterService) interpreterService: IInterpreterService) {
+        @inject(IFileSystem) fs: IFileSystem,
+        @inject(IInterpreterService) interpreterService: IInterpreterService
+    ) {
         this.serverFactory = new RoleBasedFactory<IJupyterServerInterface, JupyterServerClassType>(
             liveShare,
             HostJupyterServer,
@@ -77,6 +81,7 @@ export class JupyterServerFactory implements INotebookServer, ILiveShareHasRole 
             workspaceService,
             serviceContainer,
             appShell,
+            fs,
             interpreterService
         );
     }

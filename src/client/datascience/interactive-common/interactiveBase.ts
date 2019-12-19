@@ -3,12 +3,11 @@
 'use strict';
 import '../../common/extensions';
 
-import * as fs from 'fs-extra';
 import { injectable, unmanaged } from 'inversify';
 import * as os from 'os';
 import * as path from 'path';
 import * as uuid from 'uuid/v4';
-import { ConfigurationTarget, Event, EventEmitter, Position, ProgressLocation, ProgressOptions, Range, Selection, TextEditor, Uri, ViewColumn } from 'vscode';
+import { ConfigurationTarget, Event, EventEmitter, Memento, Position, ProgressLocation, ProgressOptions, Range, Selection, TextEditor, Uri, ViewColumn } from 'vscode';
 import { Disposable } from 'vscode-jsonrpc';
 import * as vsls from 'vsls/vscode';
 
@@ -32,6 +31,7 @@ import { IInterpreterService, PythonInterpreter } from '../../interpreter/contra
 import { captureTelemetry, sendTelemetryEvent } from '../../telemetry';
 import { generateCellRangesFromDocument } from '../cellFactory';
 import { CellMatcher } from '../cellMatcher';
+import { addToUriList } from '../common';
 import { Identifiers, Settings, Telemetry } from '../constants';
 import { ColumnWarningSize } from '../data-viewing/types';
 import { DataScience } from '../datascience';
@@ -115,6 +115,7 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
         @unmanaged() protected ipynbProvider: INotebookEditorProvider,
         @unmanaged() private dataScience: DataScience,
         @unmanaged() protected errorHandler: IDataScienceErrorHandler,
+        @unmanaged() protected globalStorage: Memento,
         @unmanaged() rootPath: string,
         @unmanaged() scripts: string[],
         @unmanaged() title: string,
@@ -955,7 +956,7 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
     private async gotoCodeInternal(file: string, line: number) {
         let editor: TextEditor | undefined;
 
-        if (await fs.pathExists(file)) {
+        if (await this.fileSystem.fileExists(file)) {
             editor = await this.documentManager.showTextDocument(Uri.file(file), { viewColumn: ViewColumn.One });
         } else {
             // File URI isn't going to work. Look through the active text documents
@@ -1066,16 +1067,33 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
 
             const statusChangeHandler = async (status: ServerStatus) => {
                 if (this.notebook) {
-                    const settings = this.configuration.getSettings();
                     const kernelSpec = this.notebook.getKernelSpec();
 
                     if (kernelSpec) {
+                        const connectionInfo = this.notebook.server.getConnectionInfo();
+                        let localizedUri = '';
+
+                        // Determine the connection URI of the connected server to display
+                        if (connectionInfo) {
+                            if (connectionInfo.localLaunch) {
+                                localizedUri = localize.DataScience.localJupyterServer();
+                            } else {
+                                if (connectionInfo.token) {
+                                    localizedUri = `${connectionInfo.baseUrl}?token=${connectionInfo.token}`;
+                                } else {
+                                    localizedUri = connectionInfo.baseUrl;
+                                }
+
+                                // Log this remote URI into our MRU list
+                                addToUriList(this.globalStorage, localizedUri, Date.now());
+                            }
+                        }
+
                         const name = kernelSpec.display_name || kernelSpec.name;
 
                         await this.postMessage(InteractiveWindowMessages.UpdateKernel, {
                             jupyterServerStatus: status,
-                            localizedUri: settings.datascience.jupyterServerURI.toLowerCase() === Settings.JupyterServerLocalLaunch ?
-                                localize.DataScience.localJupyterServer() : settings.datascience.jupyterServerURI,
+                            localizedUri,
                             displayName: name
                         });
                     }
@@ -1259,14 +1277,14 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
         traceInfo(`Request for onigasm file at ${filePath}`);
         if (this.fileSystem) {
             if (await this.fileSystem.fileExists(filePath)) {
-                const contents = await fs.readFile(filePath);
+                const contents = await this.fileSystem.readData(filePath);
                 this.postMessage(InteractiveWindowMessages.LoadOnigasmAssemblyResponse, contents).ignoreErrors();
             } else {
                 // During development it's actually in the node_modules folder
                 filePath = path.join(EXTENSION_ROOT_DIR, 'node_modules', 'onigasm', 'lib', 'onigasm.wasm');
                 traceInfo(`Backup request for onigasm file at ${filePath}`);
                 if (await this.fileSystem.fileExists(filePath)) {
-                    const contents = await fs.readFile(filePath);
+                    const contents = await this.fileSystem.readData(filePath);
                     this.postMessage(InteractiveWindowMessages.LoadOnigasmAssemblyResponse, contents).ignoreErrors();
                 } else {
                     traceWarning('Onigasm file not found. Colorization will not be available.');
@@ -1306,7 +1324,7 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
                 }
 
                 // Change the kernel. A status update should fire that changes our display
-                await this.notebook!.setKernelSpec(newKernel.kernelSpec || newKernel.kernelModel!);
+                await this.notebook!.setKernelSpec(newKernel.kernelSpec || newKernel.kernelModel!, this.configService.getSettings().datascience.jupyterLaunchTimeout);
 
                 // Add in a new sys info
                 await this.addSysInfo(SysInfoReason.New);

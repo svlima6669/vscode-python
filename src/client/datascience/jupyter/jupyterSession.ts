@@ -14,6 +14,8 @@ import { traceInfo, traceWarning } from '../../common/logger';
 import { sleep, waitForPromise } from '../../common/utils/async';
 import * as localize from '../../common/utils/localize';
 import { noop } from '../../common/utils/misc';
+import { captureTelemetry } from '../../telemetry';
+import { Telemetry } from '../constants';
 import { IConnection, IJupyterKernelSpec, IJupyterSession } from '../types';
 import { JupyterWaitForIdleError } from './jupyterWaitForIdleError';
 import { JupyterKernelPromiseFailedError } from './kernels/jupyterKernelPromiseFailedError';
@@ -99,6 +101,10 @@ export class JupyterSession implements IJupyterSession {
     }
 
     public async restart(_timeout: number): Promise<void> {
+        if (this.session?.isRemoteSession) {
+            await this.session.kernel.restart();
+            return;
+        }
         // Just kill the current session and switch to the other
         if (this.restartSessionPromise && this.session && this.sessionManager && this.contentsManager) {
             traceInfo(`Restarting ${this.session.kernel.id}`);
@@ -183,7 +189,7 @@ export class JupyterSession implements IJupyterSession {
         return this.connected;
     }
 
-    public async changeKernel(kernel: IJupyterKernelSpec | LiveKernelModel): Promise<void> {
+    public async changeKernel(kernel: IJupyterKernelSpec | LiveKernelModel, timeoutMS: number): Promise<void> {
         if (kernel.id && this.session && 'session' in kernel) {
             // Shutdown the current session
             this.shutdownSession(this.session, this.statusHandler).ignoreErrors();
@@ -192,7 +198,7 @@ export class JupyterSession implements IJupyterSession {
             this.session = this.sessionManager.connectTo(kernel.session);
             this.session.isRemoteSession = true;
             this.session.statusChanged.connect(this.statusHandler);
-            return;
+            return this.waitForIdleOnSession(this.session, timeoutMS);
         }
 
         // This is just like doing a restart, kill the old session (and the old restart session), and start new ones
@@ -206,6 +212,9 @@ export class JupyterSession implements IJupyterSession {
 
         // Start a new session
         this.session = await this.createSession(this.serverSettings, this.contentsManager);
+
+        // Make sure it is idle before we return
+        await this.waitForIdleOnSession(this.session, timeoutMS);
 
         // Listen for session status changes
         this.session.statusChanged.connect(this.statusHandler);
@@ -244,10 +253,12 @@ export class JupyterSession implements IJupyterSession {
         }
     }
 
+    @captureTelemetry(Telemetry.WaitForIdleJupyter, undefined, true)
     private async waitForIdleOnSession(session: ISession | undefined, timeout: number): Promise<void> {
         if (session && session.kernel) {
             traceInfo(`Waiting for idle on (kernel): ${session.kernel.id} -> ${session.kernel.status}`);
 
+            const kernelStatusChangedPromise = new Promise(resolve => session.statusChanged.connect((_, e) => e === 'idle' ? resolve() : undefined));
             const statusChangedPromise = new Promise(resolve => session.kernelChanged.connect((_, e) => (e.newValue && e.newValue.status === 'idle' ? resolve() : undefined)));
             const checkStatusPromise = new Promise(async resolve => {
                 // This function seems to cause CI builds to timeout randomly on
@@ -259,7 +270,7 @@ export class JupyterSession implements IJupyterSession {
                 }
                 resolve();
             });
-            await Promise.race([statusChangedPromise, checkStatusPromise]);
+            await Promise.race([kernelStatusChangedPromise, statusChangedPromise, checkStatusPromise]);
             traceInfo(`Finished waiting for idle on (kernel): ${session.kernel.id} -> ${session.kernel.status}`);
 
             // If we didn't make it out in ten seconds, indicate an error
@@ -338,7 +349,8 @@ export class JupyterSession implements IJupyterSession {
                     session.statusChanged.disconnect(statusHandler);
                 }
                 // Do not shutdown remote sessions.
-                if (session.isRemoteSession){
+                if (session.isRemoteSession) {
+                    session.dispose();
                     return;
                 }
                 try {

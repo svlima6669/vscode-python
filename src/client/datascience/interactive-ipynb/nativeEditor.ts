@@ -1,31 +1,86 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 'use strict';
+import '../../common/extensions';
+
 import { nbformat } from '@jupyterlab/coreutils/lib/nbformat';
 import * as detectIndent from 'detect-indent';
 import { inject, injectable, multiInject, named } from 'inversify';
 import * as path from 'path';
 import * as uuid from 'uuid/v4';
 import { Event, EventEmitter, Memento, TextEditor, Uri, ViewColumn } from 'vscode';
-import { IApplicationShell, ICommandManager, IDocumentManager, ILiveShareApi, IWebPanelProvider, IWorkspaceService } from '../../common/application/types';
+
+import {
+    IApplicationShell,
+    ICommandManager,
+    IDocumentManager,
+    ILiveShareApi,
+    IWebPanelProvider,
+    IWorkspaceService
+} from '../../common/application/types';
 import { ContextKey } from '../../common/contextKey';
-import '../../common/extensions';
 import { traceError } from '../../common/logger';
 import { IFileSystem, TemporaryFile } from '../../common/platform/types';
-import { GLOBAL_MEMENTO, IConfigurationService, IDisposableRegistry, IMemento, WORKSPACE_MEMENTO } from '../../common/types';
+import {
+    GLOBAL_MEMENTO,
+    IConfigurationService,
+    ICryptoUtils,
+    IDisposableRegistry,
+    IExtensionContext,
+    IMemento,
+    WORKSPACE_MEMENTO
+} from '../../common/types';
 import { createDeferred, Deferred } from '../../common/utils/async';
 import * as localize from '../../common/utils/localize';
+import { noop } from '../../common/utils/misc';
 import { StopWatch } from '../../common/utils/stopWatch';
 import { EXTENSION_ROOT_DIR } from '../../constants';
 import { IInterpreterService } from '../../interpreter/contracts';
 import { captureTelemetry, sendTelemetryEvent } from '../../telemetry';
 import { concatMultilineStringInput, splitMultilineString } from '../common';
-import { EditorContexts, Identifiers, NativeKeyboardCommandTelemetryLookup, NativeMouseCommandTelemetryLookup, Telemetry } from '../constants';
+import {
+    EditorContexts,
+    Identifiers,
+    NativeKeyboardCommandTelemetryLookup,
+    NativeMouseCommandTelemetryLookup,
+    Telemetry
+} from '../constants';
 import { DataScience } from '../datascience';
 import { InteractiveBase } from '../interactive-common/interactiveBase';
-import { IEditCell, IInsertCell, INativeCommand, InteractiveWindowMessages, IRemoveCell, ISaveAll, ISubmitNewCell, ISwapCells } from '../interactive-common/interactiveWindowTypes';
+import {
+    IEditCell,
+    IInsertCell,
+    INativeCommand,
+    InteractiveWindowMessages,
+    IRemoveCell,
+    ISaveAll,
+    ISubmitNewCell,
+    ISwapCells
+} from '../interactive-common/interactiveWindowTypes';
 import { InvalidNotebookFileError } from '../jupyter/invalidNotebookFileError';
-import { CellState, ICell, ICodeCssGenerator, IDataScience, IDataScienceErrorHandler, IDataViewerProvider, IInteractiveWindowInfo, IInteractiveWindowListener, IJupyterDebugger, IJupyterExecution, IJupyterVariables, INotebookEditor, INotebookEditorProvider, INotebookExporter, INotebookImporter, INotebookServerOptions, IStatusProvider, IThemeFinder } from '../types';
+import {
+    CellState,
+    ICell,
+    ICodeCssGenerator,
+    IDataScience,
+    IDataScienceErrorHandler,
+    IDataViewerProvider,
+    IInteractiveWindowInfo,
+    IInteractiveWindowListener,
+    IJupyterDebugger,
+    IJupyterExecution,
+    IJupyterVariables,
+    INotebookEditor,
+    INotebookEditorProvider,
+    INotebookExporter,
+    INotebookImporter,
+    INotebookServerOptions,
+    IStatusProvider,
+    IThemeFinder
+} from '../types';
+
+// tslint:disable-next-line:no-require-imports no-var-requires
+const debounce = require('lodash/debounce') as typeof import('lodash/debounce');
 
 const nativeEditorDir = path.join(EXTENSION_ROOT_DIR, 'out', 'datascience-ui', 'native-editor');
 enum AskForSaveResult {
@@ -33,6 +88,9 @@ enum AskForSaveResult {
     No,
     Cancel
 }
+
+const KeyPrefix = 'notebook-storage-';
+const NotebookTransferKey = 'notebook-transfered';
 
 @injectable()
 export class NativeEditor extends InteractiveBase implements INotebookEditor {
@@ -50,6 +108,7 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
     private loadedAllCells: boolean = false;
     private indentAmount: string = ' ';
     private notebookJson: Partial<nbformat.INotebookContent> = {};
+    private debouncedWriteToStorage = debounce(this.writeToStorage.bind(this), 250);
 
     constructor(
         @multiInject(IInteractiveWindowListener) listeners: IInteractiveWindowListener[],
@@ -75,8 +134,10 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
         @inject(INotebookImporter) private importer: INotebookImporter,
         @inject(IDataScience) dataScience: DataScience,
         @inject(IDataScienceErrorHandler) errorHandler: IDataScienceErrorHandler,
-        @inject(IMemento) @named(GLOBAL_MEMENTO) private globalStorage: Memento,
-        @inject(IMemento) @named(WORKSPACE_MEMENTO) private localStorage: Memento
+        @inject(IMemento) @named(GLOBAL_MEMENTO) globalStorage: Memento,
+        @inject(IMemento) @named(WORKSPACE_MEMENTO) private localStorage: Memento,
+        @inject(ICryptoUtils) private crypto: ICryptoUtils,
+        @inject(IExtensionContext) private context: IExtensionContext
     ) {
         super(
             listeners,
@@ -100,6 +161,7 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
             editorProvider,
             dataScience,
             errorHandler,
+            globalStorage,
             nativeEditorDir,
             [path.join(nativeEditorDir, 'index_bundle.js')],
             localize.DataScience.nativeEditorTitle(),
@@ -152,6 +214,12 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
 
         // Show ourselves
         await this.show();
+
+        // Clear out old global storage the first time somebody opens
+        // a notebook
+        if (!this.globalStorage.get(NotebookTransferKey)) {
+            await this.transferStorage();
+        }
 
         // See if this file was stored in storage prior to shutdown
         const dirtyContents = await this.getStoredContents();
@@ -581,7 +649,7 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
     }
 
     private getStorageKey(): string {
-        return `notebook-storage-${this._file.toString()}`;
+        return `${KeyPrefix}${this._file.toString()}`;
     }
     /**
      * Gets any unsaved changes to the notebook file.
@@ -593,29 +661,112 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
      */
     private async getStoredContents(): Promise<string | undefined> {
         const key = this.getStorageKey();
-        const data = this.globalStorage.get<{ contents?: string; lastModifiedTimeMs?: number }>(key);
-        // Check whether the file has been modified since the last time the contents were saved.
-        if (data && data.lastModifiedTimeMs && !this.isUntitled && this.file.scheme === 'file') {
-            const stat = await this.fileSystem.stat(this.file.fsPath);
-            if (stat.mtime > data.lastModifiedTimeMs) {
-                return;
+
+        // First look in the global storage file location
+        let result = await this.getStoredContentsFromFile(key);
+        if (!result) {
+            result = await this.getStoredContentsFromGlobalStorage(key);
+            if (!result) {
+                result = await this.getStoredContentsFromLocalStorage(key);
             }
         }
-        if (data && !this.isUntitled && data.contents) {
-            return data.contents;
-        }
 
+        return result;
+    }
+
+    private async getStoredContentsFromFile(key: string): Promise<string | undefined> {
+        const filePath = this.getHashedFileName(key);
+        try {
+            // Use this to read from the extension global location
+            const contents = await this.fileSystem.readFile(filePath);
+            const data = JSON.parse(contents);
+            // Check whether the file has been modified since the last time the contents were saved.
+            if (data && data.lastModifiedTimeMs && !this.isUntitled && this.file.scheme === 'file') {
+                const stat = await this.fileSystem.stat(this.file.fsPath);
+                if (stat.mtime > data.lastModifiedTimeMs) {
+                    return;
+                }
+            }
+            if (data && !this.isUntitled && data.contents) {
+                return data.contents;
+            }
+        } catch {
+            noop();
+        }
+    }
+
+    private async getStoredContentsFromGlobalStorage(key: string): Promise<string | undefined> {
+        try {
+            const data = this.globalStorage.get<{ contents?: string; lastModifiedTimeMs?: number }>(key);
+
+            // If we have data here, make sure we eliminate any remnants of storage
+            if (data) {
+                await this.transferStorage();
+            }
+
+            // Check whether the file has been modified since the last time the contents were saved.
+            if (data && data.lastModifiedTimeMs && !this.isUntitled && this.file.scheme === 'file') {
+                const stat = await this.fileSystem.stat(this.file.fsPath);
+                if (stat.mtime > data.lastModifiedTimeMs) {
+                    return;
+                }
+            }
+            if (data && !this.isUntitled && data.contents) {
+                return data.contents;
+            }
+        } catch {
+            noop();
+        }
+    }
+
+    private async getStoredContentsFromLocalStorage(key: string): Promise<string | undefined> {
         const workspaceData = this.localStorage.get<string>(key);
         if (workspaceData && !this.isUntitled) {
             // Make sure to clear so we don't use this again.
             this.localStorage.update(key, undefined);
 
-            // Transfer this to global storage so we use that next time instead
-            const stat = await this.fileSystem.stat(this.file.fsPath);
-            this.globalStorage.update(key, { contents: workspaceData, lastModifiedTimeMs: stat ? stat.mtime : undefined });
+            // Transfer this to a file so we use that next time instead.
+            const filePath = this.getHashedFileName(key);
+            await this.writeToStorage(filePath, workspaceData);
 
             return workspaceData;
         }
+    }
+
+    // VS code recommended we use the hidden '_values' to iterate over all of the entries in
+    // the global storage map and delete the ones we own.
+    private async transferStorage(): Promise<void[]> {
+        const promises: Thenable<void>[] = [];
+
+        // Indicate we ran this function
+        await this.globalStorage.update(NotebookTransferKey, true);
+
+        try {
+            // tslint:disable-next-line: no-any
+            if ((this.globalStorage as any)._value) {
+                // tslint:disable-next-line: no-any
+                const keys = Object.keys((this.globalStorage as any)._value);
+                [...keys].forEach((k: string) => {
+                    if (k.startsWith(KeyPrefix)) {
+                        // Write each pair to our alternate storage, but don't bother waiting for each
+                        // to finish.
+                        const filePath = this.getHashedFileName(k);
+                        const contents = this.globalStorage.get(k);
+                        if (contents) {
+                            this.writeToStorage(filePath, JSON.stringify(contents)).ignoreErrors();
+                        }
+
+                        // Remove from the map so that global storage does not have this anymore.
+                        // Use the real API here as we don't know how the map really gets updated.
+                        promises.push(this.globalStorage.update(k, undefined));
+                    }
+                });
+            }
+        } catch (e) {
+            traceError('Exception eliminating global storage parts:', e);
+        }
+
+        return Promise.all(promises);
     }
 
     /**
@@ -629,10 +780,34 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
      * @memberof NativeEditor
      */
     private async storeContents(contents?: string): Promise<void> {
-        const key = this.getStorageKey();
-        // Keep track of the time when this data was saved.
-        // This way when we retrieve the data we can compare it against last modified date of the file.
-        await this.globalStorage.update(key, contents ? { contents, lastModifiedTimeMs: Date.now() } : undefined);
+        // Skip doing this if auto save is enabled.
+        const filesConfig = this.workspaceService.getConfiguration('files', this.file);
+        const autoSave = filesConfig.get('autoSave', 'off');
+        if (autoSave === 'off') {
+            const key = this.getStorageKey();
+            const filePath = this.getHashedFileName(key);
+
+            // Keep track of the time when this data was saved.
+            // This way when we retrieve the data we can compare it against last modified date of the file.
+            const specialContents = contents ? JSON.stringify({ contents, lastModifiedTimeMs: Date.now() }) : undefined;
+
+            // Write but debounced (wait at least 250 ms)
+            return this.debouncedWriteToStorage(filePath, specialContents);
+        }
+    }
+
+    private async writeToStorage(filePath: string, contents?: string): Promise<void> {
+        if (contents) {
+            await this.fileSystem.createDirectory(path.dirname(filePath));
+            return this.fileSystem.writeFile(filePath, contents);
+        } else {
+            return this.fileSystem.deleteFile(filePath);
+        }
+    }
+
+    private getHashedFileName(key: string): string {
+        const file = `${this.crypto.createHash(key, 'string')}.ipynb`;
+        return path.join(this.context.globalStoragePath, file);
     }
 
     private async close(): Promise<void> {

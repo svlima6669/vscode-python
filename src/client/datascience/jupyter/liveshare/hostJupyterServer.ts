@@ -12,10 +12,10 @@ import { IApplicationShell, ILiveShareApi, IWorkspaceService } from '../../../co
 import { traceInfo } from '../../../common/logger';
 import { IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry } from '../../../common/types';
 import * as localize from '../../../common/utils/localize';
-import { StopWatch } from '../../../common/utils/stopWatch';
+
+import { IFileSystem } from '../../../common/platform/types';
 import { IServiceContainer } from '../../../ioc/types';
-import { sendTelemetryEvent } from '../../../telemetry';
-import { Identifiers, LiveShare, LiveShareCommands, RegExpValues, Telemetry } from '../../constants';
+import { Identifiers, LiveShare, LiveShareCommands, RegExpValues } from '../../constants';
 import {
     IDataScience,
     IJupyterSession,
@@ -48,7 +48,8 @@ export class HostJupyterServer
         sessionManager: IJupyterSessionManagerFactory,
         private workspaceService: IWorkspaceService,
         serviceContainer: IServiceContainer,
-        private appService: IApplicationShell
+        private appService: IApplicationShell,
+        private fs: IFileSystem
     ) {
         super(liveShare, asyncRegistry, disposableRegistry, configService, sessionManager, serviceContainer);
     }
@@ -178,15 +179,14 @@ export class HostJupyterServer
                 resource,
                 this.getDisposedError.bind(this),
                 this.workspaceService,
-                this.appService
+                this.appService,
+                this.fs
             );
 
             // Wait for it to be ready
             traceInfo(`Waiting for idle (session) ${this.id}`);
-            const stopWatch = new StopWatch();
             const idleTimeout = configService.getSettings().datascience.jupyterLaunchTimeout;
             await notebook.waitForIdle(idleTimeout);
-            sendTelemetryEvent(Telemetry.WaitForIdleJupyter, stopWatch.elapsedTime);
 
             // Run initial setup
             await notebook.initialize(cancelToken);

@@ -1095,6 +1095,10 @@ export interface IEventNamePropertyMapping {
      */
     [EventName.PYTHON_LANGUAGE_SERVER_STARTUP]: never | undefined;
     /**
+     * Telemetry event sent when user specified None to the language server and jediEnabled is false.
+     */
+    [EventName.PYTHON_LANGUAGE_SERVER_NONE]: never | undefined;
+    /**
      * Telemetry sent from Language Server (details of telemetry sent can be provided by LS team)
      */
     [EventName.PYTHON_LANGUAGE_SERVER_TELEMETRY]: any;
@@ -1591,5 +1595,54 @@ export interface IEventNamePropertyMapping {
         shellIdentificationSource: 'terminalName' | 'settings' | 'environment' | 'default' | 'vscode';
         hasCustomShell: undefined | boolean;
         hasShellInEnv: undefined | boolean;
+    };
+    /**
+     * Telemetry event sent when getting environment variables for an activated environment has failed.
+     *
+     * @type {(undefined | never)}
+     * @memberof IEventNamePropertyMapping
+     */
+    [EventName.ACTIVATE_ENV_TO_GET_ENV_VARS_FAILED]: {
+        /**
+         * Whether the activation commands contain the name `conda`.
+         *
+         * @type {boolean}
+         */
+        isPossiblyCondaEnv: boolean;
+        /**
+         * The type of terminal shell created: powershell, cmd, zsh, bash etc.
+         *
+         * @type {TerminalShellType}
+         */
+        terminal: TerminalShellType;
+    };
+    /**
+     * Telemetry event sent once done searching for kernel spec and interpreter for a local connection.
+     *
+     * @type {{
+     *         kernelSpecFound: boolean;
+     *         interpreterFound: boolean;
+     *     }}
+     * @memberof IEventNamePropertyMapping
+     */
+    [Telemetry.FindKernelForLocalConnection]: {
+        /**
+         * Whether a kernel spec was found.
+         *
+         * @type {boolean}
+         */
+        kernelSpecFound: boolean;
+        /**
+         * Whether an interpreter was found.
+         *
+         * @type {boolean}
+         */
+        interpreterFound: boolean;
+        /**
+         * Whether user was prompted to select a kernel spec.
+         *
+         * @type {boolean}
+         */
+        promptedToSelect?: boolean;
     };
 }

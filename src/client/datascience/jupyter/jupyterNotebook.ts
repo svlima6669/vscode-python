@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 import { nbformat } from '@jupyterlab/coreutils';
 import { Kernel, KernelMessage } from '@jupyterlab/services';
-import * as fs from 'fs-extra';
 import { Observable } from 'rxjs/Observable';
 import { Subscriber } from 'rxjs/Subscriber';
 import * as uuid from 'uuid/v4';
@@ -13,6 +12,7 @@ import { IApplicationShell, ILiveShareApi, IWorkspaceService } from '../../commo
 import { Cancellation, CancellationError } from '../../common/cancellation';
 import '../../common/extensions';
 import { traceError, traceInfo, traceWarning } from '../../common/logger';
+import { IFileSystem } from '../../common/platform/types';
 import { IConfigurationService, IDisposableRegistry } from '../../common/types';
 import { createDeferred, Deferred, waitForPromise } from '../../common/utils/async';
 import * as localize from '../../common/utils/localize';
@@ -163,7 +163,8 @@ export class JupyterNotebookBase implements INotebook {
         resource: Uri,
         private getDisposedError: () => Error,
         private workspace: IWorkspaceService,
-        private applicationService: IApplicationShell
+        private applicationService: IApplicationShell,
+        private fs: IFileSystem
     ) {
         this.sessionStartTime = Date.now();
 
@@ -506,7 +507,7 @@ export class JupyterNotebookBase implements INotebook {
         return this.launchInfo.kernelSpec;
     }
 
-    public async setKernelSpec(spec: IJupyterKernelSpec | LiveKernelModel): Promise<void> {
+    public async setKernelSpec(spec: IJupyterKernelSpec | LiveKernelModel, timeoutMS: number): Promise<void> {
         // Change our own kernel spec
         this.launchInfo.kernelSpec = spec;
 
@@ -516,7 +517,7 @@ export class JupyterNotebookBase implements INotebook {
             this.ranInitialSetup = false;
 
             // Change the kernel on the session
-            await this.session.changeKernel(spec);
+            await this.session.changeKernel(spec, timeoutMS);
 
             // Rerun our initial setup
             await this.initialize();
@@ -694,11 +695,11 @@ export class JupyterNotebookBase implements INotebook {
         if (this.launchInfo && this.launchInfo.connectionInfo.localLaunch && !this._workingDirectory) {
             // See what our working dir is supposed to be
             const suggested = this.launchInfo.workingDir;
-            if (suggested && (await fs.pathExists(suggested))) {
+            if (suggested && (await this.fs.directoryExists(suggested))) {
                 // We should use the launch info directory. It trumps the possible dir
                 this._workingDirectory = suggested;
                 return this.changeDirectoryIfPossible(this._workingDirectory);
-            } else if (launchingFile && (await fs.pathExists(launchingFile))) {
+            } else if (launchingFile && (await this.fs.fileExists(launchingFile))) {
                 // Combine the working directory with this file if possible.
                 this._workingDirectory = expandWorkingDir(this.launchInfo.workingDir, launchingFile, this.workspace);
                 if (this._workingDirectory) {
@@ -709,7 +710,7 @@ export class JupyterNotebookBase implements INotebook {
     }
 
     private changeDirectoryIfPossible = async (directory: string): Promise<void> => {
-        if (this.launchInfo && this.launchInfo.connectionInfo.localLaunch && (await fs.pathExists(directory))) {
+        if (this.launchInfo && this.launchInfo.connectionInfo.localLaunch && (await this.fs.directoryExists(directory))) {
             await this.executeSilently(`%cd "${directory}"`);
         }
     }
@@ -890,17 +891,24 @@ export class JupyterNotebookBase implements INotebook {
         // If a clear is pending, replace the output with the new one
         if (clearState.get(output.output_type)) {
             clearState.delete(output.output_type);
-            // Clear all with the same type up till we have a different one
-            for (let i = data.outputs.length - 1; i >= 0 && data.outputs[i]?.output_type === output.output_type; i -= 1) {
-                data.outputs.splice(i, 1);
+            // Find the one with the same type and replace all of them
+            const index = data.outputs.findIndex(o => o.output_type === output.output_type);
+            if (index >= 0) {
+                data.outputs = data.outputs.filter(o => o.output_type !== output.output_type);
+                data.outputs.splice(index, 0, output);
+            } else {
+                data.outputs = [...data.outputs, output];
             }
+        } else {
+            // Then append this data onto the end.
+            data.outputs = [...data.outputs, output];
         }
 
-        // Then append this data onto the end.
-        data.outputs = [...data.outputs, output];
         cell.data = data;
     }
 
+    // See this for docs on the messages:
+    // https://jupyter-client.readthedocs.io/en/latest/messaging.html#messaging-in-jupyter
     private handleExecuteResult(msg: KernelMessage.IExecuteResultMsg, clearState: Map<string, boolean>, cell: ICell, trimFunc: (str: string) => string) {
         // Check our length on text output
         if (msg.content.data && msg.content.data.hasOwnProperty('text/plain')) {

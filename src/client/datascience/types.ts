@@ -103,7 +103,7 @@ export interface INotebook extends IAsyncDisposable {
     setMatplotLibStyle(useDark: boolean): Promise<void>;
     getMatchingInterpreter(): PythonInterpreter | undefined;
     getKernelSpec(): IJupyterKernelSpec | LiveKernelModel | undefined;
-    setKernelSpec(spec: IJupyterKernelSpec | LiveKernelModel): Promise<void>;
+    setKernelSpec(spec: IJupyterKernelSpec | LiveKernelModel, timeoutMS: number): Promise<void>;
     setInterpreter(interpeter: PythonInterpreter): void;
     getGatherService(): IGatherExecution | undefined;
 }
@@ -184,7 +184,7 @@ export interface IJupyterSession extends IAsyncDisposable {
     ): Kernel.IShellFuture<KernelMessage.IExecuteRequestMsg, KernelMessage.IExecuteReplyMsg> | undefined;
     requestComplete(content: KernelMessage.ICompleteRequestMsg['content']): Promise<KernelMessage.ICompleteReplyMsg | undefined>;
     sendInputReply(content: string): void;
-    changeKernel(kernel: IJupyterKernelSpec | LiveKernelModel): Promise<void>;
+    changeKernel(kernel: IJupyterKernelSpec | LiveKernelModel, timeoutMS: number): Promise<void>;
 }
 
 export const IJupyterSessionManagerFactory = Symbol('IJupyterSessionManagerFactory');
@@ -304,11 +304,11 @@ export interface INotebookEditorProvider {
 // For native editing, the INotebookEditor acts like a TextEditor and a TextDocument together
 export const INotebookEditor = Symbol('INotebookEditor');
 export interface INotebookEditor extends IInteractiveBase {
-    closed: Event<INotebookEditor>;
-    executed: Event<INotebookEditor>;
-    modified: Event<INotebookEditor>;
-    saved: Event<INotebookEditor>;
-    metadataUpdated: Event<INotebookEditor>;
+    readonly closed: Event<INotebookEditor>;
+    readonly executed: Event<INotebookEditor>;
+    readonly modified: Event<INotebookEditor>;
+    readonly saved: Event<INotebookEditor>;
+    readonly metadataUpdated: Event<INotebookEditor>;
     /**
      * Is this notebook representing an untitled file which has never been saved yet.
      */
