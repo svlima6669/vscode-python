@@ -8,15 +8,7 @@ import * as sinon from 'sinon';
 import { anything, instance, mock, verify, when } from 'ts-mockito';
 import { Matcher } from 'ts-mockito/lib/matcher/type/Matcher';
 import * as typemoq from 'typemoq';
-import {
-    ConfigurationChangeEvent,
-    ConfigurationTarget,
-    Disposable,
-    EventEmitter,
-    TextEditor,
-    Uri,
-    WorkspaceConfiguration
-} from 'vscode';
+import { ConfigurationChangeEvent, ConfigurationTarget, Disposable, EventEmitter, TextEditor, Uri, WorkspaceConfiguration } from 'vscode';
 
 import { ApplicationShell } from '../../../client/common/application/applicationShell';
 import { CommandManager } from '../../../client/common/application/commandManager';
@@ -36,14 +28,12 @@ import { WorkspaceService } from '../../../client/common/application/workspace';
 import { PythonSettings } from '../../../client/common/configSettings';
 import { ConfigurationService } from '../../../client/common/configuration/service';
 import { CryptoUtils } from '../../../client/common/crypto';
-import { LiveShareApi } from '../../../client/common/liveshare/liveshare';
 import { IFileSystem } from '../../../client/common/platform/types';
 import { IConfigurationService, ICryptoUtils, IExtensionContext } from '../../../client/common/types';
 import { createDeferred } from '../../../client/common/utils/async';
 import { EXTENSION_ROOT_DIR } from '../../../client/constants';
 import { CodeCssGenerator } from '../../../client/datascience/codeCssGenerator';
 import { DataViewerProvider } from '../../../client/datascience/data-viewing/dataViewerProvider';
-import { DataScience } from '../../../client/datascience/datascience';
 import { DataScienceErrorHandler } from '../../../client/datascience/errorHandler/errorHandler';
 import { InteractiveWindowMessages } from '../../../client/datascience/interactive-common/interactiveWindowTypes';
 import { NativeEditor } from '../../../client/datascience/interactive-ipynb/nativeEditor';
@@ -53,6 +43,7 @@ import { JupyterExecutionFactory } from '../../../client/datascience/jupyter/jup
 import { JupyterExporter } from '../../../client/datascience/jupyter/jupyterExporter';
 import { JupyterImporter } from '../../../client/datascience/jupyter/jupyterImporter';
 import { JupyterVariables } from '../../../client/datascience/jupyter/jupyterVariables';
+import { LiveShareApi } from '../../../client/datascience/liveshare/liveshare';
 import { ThemeFinder } from '../../../client/datascience/themeFinder';
 import {
     ICodeCssGenerator,
@@ -109,7 +100,6 @@ suite('Data Science - Native Editor', () => {
     let fileSystem: typemoq.IMock<IFileSystem>;
     let docManager: IDocumentManager;
     let dsErrorHandler: IDataScienceErrorHandler;
-    let ds: DataScience;
     let cmdManager: ICommandManager;
     let liveShare: ILiveShareApi;
     let applicationShell: IApplicationShell;
@@ -240,7 +230,6 @@ suite('Data Science - Native Editor', () => {
         fileSystem = typemoq.Mock.ofType<IFileSystem>();
         docManager = mock(DocumentManager);
         dsErrorHandler = mock(DataScienceErrorHandler);
-        ds = mock(DataScience);
         cmdManager = mock(CommandManager);
         workspace = mock(WorkspaceService);
         liveShare = mock(LiveShareApi);
@@ -290,7 +279,9 @@ suite('Data Science - Native Editor', () => {
                 listener.onMessage(InteractiveWindowMessages.Started, undefined);
                 return true;
             }
-            public toString() { return ''; }
+            public toString() {
+                return '';
+            }
         }
         const matcher = (): any => {
             return new WebPanelCreateMatcher();
@@ -298,22 +289,25 @@ suite('Data Science - Native Editor', () => {
         when(webPanelProvider.create(matcher())).thenResolve(instance(webPanel));
         lastWriteFileValue = undefined;
         wroteToFileEvent = new EventEmitter<string>();
-        fileSystem.setup(f => f.writeFile(typemoq.It.isAny(), typemoq.It.isAny())).returns((a1, a2) => {
-            if (a1.includes(`${testIndex}.ipynb`)) {
-                lastWriteFileValue = a2;
-                wroteToFileEvent.fire(a2);
-            }
-            return Promise.resolve();
-        });
-        fileSystem.setup(f => f.readFile(typemoq.It.isAny())).returns((_a1) => {
-            return Promise.resolve(lastWriteFileValue);
-        });
+        fileSystem
+            .setup(f => f.writeFile(typemoq.It.isAny(), typemoq.It.isAny()))
+            .returns((a1, a2) => {
+                if (a1.includes(`${testIndex}.ipynb`)) {
+                    lastWriteFileValue = a2;
+                    wroteToFileEvent.fire(a2);
+                }
+                return Promise.resolve();
+            });
+        fileSystem
+            .setup(f => f.readFile(typemoq.It.isAny()))
+            .returns(_a1 => {
+                return Promise.resolve(lastWriteFileValue);
+            });
     });
 
     teardown(() => {
         storage.clear();
         sinon.reset();
-
     });
 
     function createEditor() {
@@ -339,7 +333,6 @@ suite('Data Science - Native Editor', () => {
             instance(jupyterVariables),
             instance(jupyterDebugger),
             instance(importer),
-            instance(ds),
             instance(dsErrorHandler),
             storage,
             localStorage,
@@ -374,17 +367,19 @@ suite('Data Science - Native Editor', () => {
         expect(await editor.getContents()).to.be.equal(baseFile);
         expect(editor.isDirty).to.be.equal(false, 'Editor should not be dirty');
         editor.onMessage(InteractiveWindowMessages.EditCell, {
-            changes: [{
-                range: {
-                    startLineNumber: 2,
-                    startColumn: 1,
-                    endLineNumber: 2,
-                    endColumn: 1
-                },
-                rangeOffset: 4,
-                rangeLength: 0,
-                text: 'a'
-            }],
+            changes: [
+                {
+                    range: {
+                        startLineNumber: 2,
+                        startColumn: 1,
+                        endLineNumber: 2,
+                        endColumn: 1
+                    },
+                    rangeOffset: 4,
+                    rangeLength: 0,
+                    text: 'a'
+                }
+            ],
             id: 'NotebookImport#1'
         });
         expect(editor.cells).to.be.lengthOf(3);
@@ -616,15 +611,19 @@ suite('Data Science - Native Editor', () => {
         // Make our call to actually export
         editor.onMessage(InteractiveWindowMessages.Export, editor.cells);
 
-        await waitForCondition(async () => {
-            try {
-                // Wait until showTextDocument has been called, that's the signal that export is done
-                verify(docManager.showTextDocument(anything(), anything())).atLeast(1);
-                return true;
-            } catch {
-                return false;
-            }
-        }, 1_000, 'Timeout');
+        await waitForCondition(
+            async () => {
+                try {
+                    // Wait until showTextDocument has been called, that's the signal that export is done
+                    verify(docManager.showTextDocument(anything(), anything())).atLeast(1);
+                    return true;
+                } catch {
+                    return false;
+                }
+            },
+            1_000,
+            'Timeout'
+        );
 
         // Verify that we also opened our text document not exact match as verify doesn't seem to match that
         verify(docManager.openTextDocument(anything())).once();

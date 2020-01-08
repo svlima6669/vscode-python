@@ -10,7 +10,16 @@ import { noop } from '../../common/utils/misc';
 import { generateCellsFromString } from '../cellFactory';
 import { Identifiers } from '../constants';
 import { IInteractiveWindowMapping, InteractiveWindowMessages } from '../interactive-common/interactiveWindowTypes';
-import { ICell, IGatherExecution, IInteractiveWindowListener, IInteractiveWindowProvider, IJupyterExecution, INotebook, INotebookEditorProvider, INotebookExporter } from '../types';
+import {
+    ICell,
+    IGatherExecution,
+    IInteractiveWindowListener,
+    IInteractiveWindowProvider,
+    IJupyterExecution,
+    INotebook,
+    INotebookEditorProvider,
+    INotebookExporter
+} from '../types';
 
 @injectable()
 export class GatherListener implements IInteractiveWindowListener {
@@ -104,21 +113,25 @@ export class GatherListener implements IInteractiveWindowListener {
         } else {
             await this.showNotebook(slicedProgram, cell);
         }
-    }
+    };
 
     private async showNotebook(slicedProgram: string, cell: ICell) {
         if (slicedProgram) {
-            let cells: ICell[] = [{
-                id: uuid(),
-                file: '',
-                line: 0,
-                state: 0,
-                data: {
-                    cell_type: 'markdown',
-                    source: localize.DataScience.gatheredNotebookDescriptionInMarkdown().format(cell.file === Identifiers.EmptyFileName && this.notebookUri ? this.notebookUri.fsPath : cell.file),
-                    metadata: {}
+            let cells: ICell[] = [
+                {
+                    id: uuid(),
+                    file: '',
+                    line: 0,
+                    state: 0,
+                    data: {
+                        cell_type: 'markdown',
+                        source: localize.DataScience.gatheredNotebookDescriptionInMarkdown().format(
+                            cell.file === Identifiers.EmptyFileName && this.notebookUri ? this.notebookUri.fsPath : cell.file
+                        ),
+                        metadata: {}
+                    }
                 }
-            }];
+            ];
 
             // Create new notebook with the returned program and open it.
             cells = cells.concat(generateCellsFromString(slicedProgram));
@@ -153,7 +166,7 @@ export class GatherListener implements IInteractiveWindowListener {
         const editor = await this.documentManager.showTextDocument(doc, viewColumn);
 
         // Edit the document so that it is dirty (add a space at the end)
-        editor.edit((editBuilder) => {
+        editor.edit(editBuilder => {
             editBuilder.insert(new Position(editor.document.lineCount, 0), '\n');
         });
     }

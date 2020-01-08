@@ -122,10 +122,10 @@ export function sendTelemetryEvent<P extends IEventNamePropertyMapping, E extend
 // tslint:disable-next-line:no-any function-name
 export function captureTelemetry<P extends IEventNamePropertyMapping, E extends keyof P>(eventName: E, properties?: P[E], captureDuration: boolean = true, failureEventName?: E) {
     // tslint:disable-next-line:no-function-expression no-any
-    return function (_target: Object, _propertyKey: string, descriptor: TypedPropertyDescriptor<any>) {
+    return function(_target: Object, _propertyKey: string, descriptor: TypedPropertyDescriptor<any>) {
         const originalMethod = descriptor.value;
         // tslint:disable-next-line:no-function-expression no-any
-        descriptor.value = function (...args: any[]) {
+        descriptor.value = function(...args: any[]) {
             if (!captureDuration) {
                 sendTelemetryEvent(eventName, undefined, properties);
                 // tslint:disable-next-line:no-invalid-this
@@ -1117,6 +1117,19 @@ export interface IEventNamePropertyMapping {
      */
     [EventName.PYTHON_EXPERIMENTS_DISABLED]: never | undefined;
     /**
+     * Telemetry event sent with details when a user has requested to opt it or out of an experiment group
+     */
+    [EventName.PYTHON_EXPERIMENTS_OPT_IN_OUT]: {
+        /**
+         * Carries the name of the experiment user has been opted into manually
+         */
+        expNameOptedInto?: string;
+        /**
+         * Carries the name of the experiment user has been opted out of manually
+         */
+        expNameOptedOutOf?: string;
+    };
+    /**
      * Telemetry event sent with details when doing best effort to download the experiments within timeout and using it in the current session only
      */
     [EventName.PYTHON_EXPERIMENTS_DOWNLOAD_SUCCESS_RATE]: {
@@ -1645,4 +1658,11 @@ export interface IEventNamePropertyMapping {
          */
         promptedToSelect?: boolean;
     };
+    /**
+     * Telemetry event sent when starting a session for a local connection failed.
+     *
+     * @type {(undefined | never)}
+     * @memberof IEventNamePropertyMapping
+     */
+    [Telemetry.StartSessionFailedJupyter]: undefined | never;
 }

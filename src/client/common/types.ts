@@ -4,16 +4,28 @@
 
 import { Socket } from 'net';
 import { Request as RequestResult } from 'request';
-import { CancellationToken, ConfigurationTarget, DiagnosticSeverity, Disposable, DocumentSymbolProvider, Event, Extension, ExtensionContext, OutputChannel, Uri, WorkspaceEdit } from 'vscode';
+import {
+    CancellationToken,
+    ConfigurationTarget,
+    DiagnosticSeverity,
+    Disposable,
+    DocumentSymbolProvider,
+    Event,
+    Extension,
+    ExtensionContext,
+    OutputChannel,
+    Uri,
+    WorkspaceEdit
+} from 'vscode';
 import { LanguageServerType } from '../activation/types';
 import { CommandsWithoutArgs } from './application/commands';
 import { ExtensionChannels } from './insidersBuild/types';
 import { InterpreterUri } from './installer/types';
 import { EnvironmentVariables } from './variables/types';
 export const IOutputChannel = Symbol('IOutputChannel');
-export interface IOutputChannel extends OutputChannel { }
+export interface IOutputChannel extends OutputChannel {}
 export const IDocumentSymbolProvider = Symbol('IDocumentSymbolProvider');
-export interface IDocumentSymbolProvider extends DocumentSymbolProvider { }
+export interface IDocumentSymbolProvider extends DocumentSymbolProvider {}
 export const IsWindows = Symbol('IS_WINDOWS');
 export const IDisposableRegistry = Symbol('IDiposableRegistry');
 export type IDisposableRegistry = { push(disposable: Disposable): void };
@@ -290,11 +302,16 @@ export interface ITerminalSettings {
 export interface IExperiments {
     /**
      * Return `true` if experiments are enabled, else `false`.
-     *
-     * @type {boolean}
-     * @memberof IExperiments
      */
     readonly enabled: boolean;
+    /**
+     * Experiments user requested to opt into manually
+     */
+    readonly optInto: string[];
+    /**
+     * Experiments user requested to opt out from manually
+     */
+    readonly optOutFrom: string[];
 }
 
 export type LanguageServerDownloadChannels = 'stable' | 'beta' | 'daily';
@@ -437,7 +454,7 @@ export interface IHttpClient {
 }
 
 export const IExtensionContext = Symbol('ExtensionContext');
-export interface IExtensionContext extends ExtensionContext { }
+export interface IExtensionContext extends ExtensionContext {}
 
 export const IExtensions = Symbol('IExtensions');
 export interface IExtensions {
@@ -522,8 +539,8 @@ export interface IAsyncDisposable {
  * Stores hash formats
  */
 export interface IHashFormat {
-    'number': number; // If hash format is a number
-    'string': string; // If hash format is a string
+    number: number; // If hash format is a number
+    string: string; // If hash format is a string
 }
 
 /**
@@ -552,8 +569,8 @@ export interface IAsyncDisposableRegistry extends IAsyncDisposable {
 export type ABExperiments = {
     name: string; // Name of the experiment
     salt: string; // Salt string for the experiment
-    min: number;  // Lower limit for the experiment
-    max: number;  // Upper limit for the experiment
+    min: number; // Lower limit for the experiment
+    max: number; // Upper limit for the experiment
 }[];
 
 /**

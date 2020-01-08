@@ -20,7 +20,6 @@ import { WorkspaceService } from '../../client/common/application/workspace';
 import { PythonSettings } from '../../client/common/configSettings';
 import { ConfigurationService } from '../../client/common/configuration/service';
 import { PYTHON_LANGUAGE } from '../../client/common/constants';
-import { LiveShareApi } from '../../client/common/liveshare/liveshare';
 import { Logger } from '../../client/common/logger';
 import { PersistentState, PersistentStateFactory } from '../../client/common/persistentState';
 import { FileSystem } from '../../client/common/platform/fileSystem';
@@ -48,6 +47,7 @@ import { JupyterExecutionFactory } from '../../client/datascience/jupyter/jupyte
 import { KernelSelector } from '../../client/datascience/jupyter/kernels/kernelSelector';
 import { LiveKernelModel } from '../../client/datascience/jupyter/kernels/types';
 import { NotebookStarter } from '../../client/datascience/jupyter/notebookStarter';
+import { LiveShareApi } from '../../client/datascience/liveshare/liveshare';
 import {
     ICell,
     IConnection,
@@ -72,6 +72,7 @@ import { MockOutputChannel } from '../mockClasses';
 import { MockAutoSelectionService } from '../mocks/autoSelector';
 
 class MockJupyterNotebook implements INotebook {
+    public onKernelChanged: Event<IJupyterKernelSpec | LiveKernelModel> = new EventEmitter<IJupyterKernelSpec | LiveKernelModel>().event;
     private onStatusChangedEvent: EventEmitter<ServerStatus> | undefined;
     constructor(private owner: INotebookServer) {
         noop();
@@ -217,7 +218,7 @@ class DisposableRegistry implements IDisposableRegistry, IAsyncDisposableRegistr
 
     public push = (disposable: Disposable): void => {
         this.disposables.push(disposable);
-    }
+    };
 
     public dispose = async (): Promise<void> => {
         for (const disposable of this.disposables) {
@@ -231,7 +232,7 @@ class DisposableRegistry implements IDisposableRegistry, IAsyncDisposableRegistr
             }
         }
         this.disposables = [];
-    }
+    };
 }
 
 suite('Jupyter Execution', async () => {

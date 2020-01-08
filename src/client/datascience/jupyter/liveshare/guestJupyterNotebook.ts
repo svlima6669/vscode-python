@@ -23,6 +23,7 @@ import { IExecuteObservableResponse, ILiveShareParticipant, IServerResponse } fr
 
 export class GuestJupyterNotebook extends LiveShareParticipantGuest(LiveShareParticipantDefault, LiveShare.JupyterNotebookSharedService)
     implements INotebook, ILiveShareParticipant {
+    public onKernelChanged: Event<IJupyterKernelSpec | LiveKernelModel> = new EventEmitter<IJupyterKernelSpec | LiveKernelModel>().event;
     private responseQueue: ResponseQueue = new ResponseQueue();
     private onStatusChangedEvent: EventEmitter<ServerStatus> | undefined;
 
@@ -210,7 +211,7 @@ export class GuestJupyterNotebook extends LiveShareParticipantGuest(LiveSharePar
         if (args.hasOwnProperty('type')) {
             this.responseQueue.push(args as IServerResponse);
         }
-    }
+    };
 
     // tslint:disable-next-line:no-any
     private async sendRequest(command: string, args: any[]): Promise<any> {

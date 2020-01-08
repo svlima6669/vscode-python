@@ -149,6 +149,10 @@ export class JupyterNotebookBase implements INotebook {
     private _workingDirectory: string | undefined;
     private _loggers: INotebookExecutionLogger[] = [];
     private onStatusChangedEvent: EventEmitter<ServerStatus> | undefined;
+    public get onKernelChanged(): Event<IJupyterKernelSpec | LiveKernelModel> {
+        return this.kernelChanged.event;
+    }
+    private kernelChanged = new EventEmitter<IJupyterKernelSpec | LiveKernelModel>();
     private sessionStatusChanged: Disposable | undefined;
     private initializedMatplotlib = false;
 
@@ -457,7 +461,7 @@ export class JupyterNotebookBase implements INotebook {
         const settings = this.configService.getSettings().datascience;
         if (settings.themeMatplotlibPlots && !settings.ignoreVscodeTheme) {
             // Reset the matplotlib style based on if dark or not.
-            await this.executeSilently(useDark ? 'matplotlib.style.use(\'dark_background\')' : `matplotlib.rcParams.update(${Identifiers.MatplotLibDefaultParams})`);
+            await this.executeSilently(useDark ? "matplotlib.style.use('dark_background')" : `matplotlib.rcParams.update(${Identifiers.MatplotLibDefaultParams})`);
         }
     }
 
@@ -508,9 +512,6 @@ export class JupyterNotebookBase implements INotebook {
     }
 
     public async setKernelSpec(spec: IJupyterKernelSpec | LiveKernelModel, timeoutMS: number): Promise<void> {
-        // Change our own kernel spec
-        this.launchInfo.kernelSpec = spec;
-
         // We need to start a new session with the new kernel spec
         if (this.session) {
             // Turn off setup
@@ -519,9 +520,18 @@ export class JupyterNotebookBase implements INotebook {
             // Change the kernel on the session
             await this.session.changeKernel(spec, timeoutMS);
 
+            // Change our own kernel spec
+            // Only after session was successfully created.
+            this.launchInfo.kernelSpec = spec;
+
             // Rerun our initial setup
             await this.initialize();
+        } else {
+            // Change our own kernel spec
+            this.launchInfo.kernelSpec = spec;
         }
+
+        this.kernelChanged.fire(spec);
     }
 
     public getGatherService(): IGatherExecution | undefined {
@@ -632,15 +642,15 @@ export class JupyterNotebookBase implements INotebook {
             const cellMatcher = new CellMatcher(this.configService.getSettings().datascience);
             return this.session
                 ? this.session.requestExecute(
-                    {
-                        // Remove the cell marker if we have one.
-                        code: cellMatcher.stripFirstMarker(code),
-                        stop_on_error: false,
-                        allow_stdin: true, // Allow when silent too in case runStartupCommands asks for a password
-                        store_history: !silent // Silent actually means don't output anything. Store_history is what affects execution_count
-                    },
-                    true
-                )
+                      {
+                          // Remove the cell marker if we have one.
+                          code: cellMatcher.stripFirstMarker(code),
+                          stop_on_error: false,
+                          allow_stdin: true, // Allow when silent too in case runStartupCommands asks for a password
+                          store_history: !silent // Silent actually means don't output anything. Store_history is what affects execution_count
+                      },
+                      true
+                  )
                 : undefined;
         } catch (exc) {
             // Any errors generating a request should just be logged. User can't do anything about it.
@@ -648,7 +658,7 @@ export class JupyterNotebookBase implements INotebook {
         }
 
         return undefined;
-    }
+    };
 
     private combineObservables = (...args: Observable<ICell>[]): Observable<ICell[]> => {
         return new Observable<ICell[]>(subscriber => {
@@ -681,7 +691,7 @@ export class JupyterNotebookBase implements INotebook {
                 );
             });
         });
-    }
+    };
 
     private executeMarkdownObservable = (cell: ICell): Observable<ICell> => {
         // Markdown doesn't need any execution
@@ -689,7 +699,7 @@ export class JupyterNotebookBase implements INotebook {
             subscriber.next(cell);
             subscriber.complete();
         });
-    }
+    };
 
     private async updateWorkingDirectory(launchingFile?: string): Promise<void> {
         if (this.launchInfo && this.launchInfo.connectionInfo.localLaunch && !this._workingDirectory) {
@@ -713,7 +723,7 @@ export class JupyterNotebookBase implements INotebook {
         if (this.launchInfo && this.launchInfo.connectionInfo.localLaunch && (await this.fs.directoryExists(directory))) {
             await this.executeSilently(`%cd "${directory}"`);
         }
-    }
+    };
 
     private handleIOPub(subscriber: CellSubscriber, silent: boolean | undefined, clearState: Map<string, boolean>, msg: KernelMessage.IIOPubMessage) {
         // tslint:disable-next-line:no-require-imports
@@ -843,7 +853,7 @@ export class JupyterNotebookBase implements INotebook {
             subscriber.cell.state = CellState.error;
             subscriber.complete(this.sessionStartTime);
         }
-    }
+    };
 
     private executeCodeObservable(cell: ICell, silent?: boolean): Observable<ICell> {
         return new Observable<ICell>(subscriber => {
@@ -905,7 +915,7 @@ export class JupyterNotebookBase implements INotebook {
         }
 
         cell.data = data;
-    }
+    };
 
     // See this for docs on the messages:
     // https://jupyter-client.readthedocs.io/en/latest/messaging.html#messaging-in-jupyter

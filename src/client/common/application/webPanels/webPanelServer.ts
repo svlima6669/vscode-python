@@ -108,7 +108,6 @@ export class WebPanelServer {
             // Here is where we'd likely support loading split bundles.
             default:
                 break;
-
         }
         ctx.body = this.fs.createReadStream(filePath);
     }
@@ -125,14 +124,14 @@ export class WebPanelServer {
 
     // tslint:disable: no-any
     private generateReactHtml(query: any) {
-        const scripts = query.scripts ? Array.isArray(query.scripts) ? query.Scripts : [query.scripts] : [''];
+        const scripts = query.scripts ? (Array.isArray(query.scripts) ? query.Scripts : [query.scripts]) : [''];
 
         return `<!doctype html>
         <html lang="en">
             <head>
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
-                <meta http-equiv="Content-Security-Policy" content="img-src 'self' data: https: http: blob:; default-src 'unsafe-inline' 'unsafe-eval' vscode-resource: data: https: http:;">
+                <meta http-equiv="Content-Security-Policy" content="img-src 'self' data: https: http: blob:; default-src 'unsafe-inline' 'unsafe-eval' vscode-resource: data: https: http: blob:;">
                 <meta name="theme-color" content="#000000">
                 <meta name="theme" content="${Identifiers.GeneratedThemeName}"/>
                 <title>React App</title>
@@ -169,6 +168,22 @@ export class WebPanelServer {
 
                 let state = ${state ? `JSON.parse("${JSON.stringify(state)}")` : undefined};
                 window.console.log('acquired vscode api');
+
+                // Special case, because we don't have a way to get the vscode api more than once,
+                // hook up some global handlers here.
+                document.addEventListener('keydown', (e) => {
+                    // Forward this message to the inner most frame that VS code owns.
+                    originalPostMessage({ command: 'did-keydown', data: {
+                        key: e.key,
+                        keyCode: e.keyCode,
+                        code: e.code,
+                        shiftKey: e.shiftKey,
+                        altKey: e.altKey,
+                        ctrlKey: e.ctrlKey,
+                        metaKey: e.metaKey,
+                        repeat: e.repeat
+                    }}, '*');
+                })
 
                 return () => {
                     if (acquired) {

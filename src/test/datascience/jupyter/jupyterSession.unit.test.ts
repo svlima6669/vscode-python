@@ -196,7 +196,7 @@ suite('Data Science - JupyterSession', () => {
                     },
                     kernel: {
                         status: 'idle',
-                        restart: () => restartCount = restartCount + 1
+                        restart: () => (restartCount = restartCount + 1)
                     },
                     shutdown: () => Promise.resolve(),
                     isRemoteSession: false
@@ -281,7 +281,7 @@ suite('Data Science - JupyterSession', () => {
                 when(restartSession.kernel).thenReturn(instance(restartKernel));
                 when(sessionManager.startNew(anything())).thenCall(() => {
                     newSessionCreated.resolve();
-                    return instance(restartSession);
+                    return Promise.resolve(instance(restartSession));
                 });
             });
             teardown(() => {
