@@ -5,16 +5,24 @@ import { nbformat } from '@jupyterlab/coreutils';
 import * as assert from 'assert';
 import * as typemoq from 'typemoq';
 
+import { PythonSettings } from '../../client/common/configSettings';
 import { IFileSystem } from '../../client/common/platform/types';
+import { IConfigurationService } from '../../client/common/types';
 import { Identifiers } from '../../client/datascience/constants';
 import { JupyterVariables } from '../../client/datascience/jupyter/jupyterVariables';
 import { CellState, ICell, IJupyterVariable, INotebook } from '../../client/datascience/types';
+import { MockAutoSelectionService } from '../mocks/autoSelector';
 
 // tslint:disable:no-any max-func-body-length
 suite('JupyterVariables', () => {
     let fakeNotebook: typemoq.IMock<INotebook>;
     let jupyterVariables: JupyterVariables;
     let fileSystem: typemoq.IMock<IFileSystem>;
+    const pythonSettings = new (class extends PythonSettings {
+        public fireChangeEvent() {
+            this.changed.fire();
+        }
+    })(undefined, new MockAutoSelectionService());
 
     function generateVariableOutput(outputData: string, outputType: string): nbformat.IOutput {
         return {
@@ -53,13 +61,43 @@ suite('JupyterVariables', () => {
     }
 
     setup(() => {
+        // Setup default settings
+        pythonSettings.datascience = {
+            allowImportFromNotebook: true,
+            jupyterLaunchTimeout: 20000,
+            jupyterLaunchRetries: 3,
+            enabled: true,
+            jupyterServerURI: 'local',
+            notebookFileRoot: 'WORKSPACE',
+            changeDirOnImportExport: true,
+            useDefaultConfigForJupyter: true,
+            jupyterInterruptTimeout: 10000,
+            searchForJupyter: true,
+            showCellInputCode: true,
+            collapseCellInputCodeByDefault: true,
+            allowInput: true,
+            maxOutputSize: 400,
+            errorBackgroundColor: '#FFFFFF',
+            sendSelectionToInteractiveWindow: false,
+            variableExplorerExclude: 'module;function;builtin_function_or_method',
+            codeRegularExpression: '^(#\\s*%%|#\\s*\\<codecell\\>|#\\s*In\\[\\d*?\\]|#\\s*In\\[ \\])',
+            markdownRegularExpression: '^(#\\s*%%\\s*\\[markdown\\]|#\\s*\\<markdowncell\\>)',
+            enableCellCodeLens: true,
+            enablePlotViewer: true,
+            runStartupCommands: '',
+            debugJustMyCode: true,
+            variableQueries: []
+        };
+
         // Create our fake notebook
         fakeNotebook = createTypeMoq<INotebook>('Fake Notebook');
+        const config = createTypeMoq<IConfigurationService>('Config ');
 
         fileSystem = typemoq.Mock.ofType<IFileSystem>();
         fileSystem.setup(fs => fs.readFile(typemoq.It.isAnyString())).returns(() => Promise.resolve('test'));
+        config.setup(s => s.getSettings()).returns(() => pythonSettings);
 
-        jupyterVariables = new JupyterVariables(fileSystem.object);
+        jupyterVariables = new JupyterVariables(fileSystem.object, config.object);
     });
 
     // No cells, no output, no text/plain
