@@ -19,12 +19,14 @@ import { ICell, IJupyterVariable, IJupyterVariables, INotebook } from '../types'
 import { JupyterDataRateLimitError } from './jupyterDataRateLimitError';
 
 // tslint:disable-next-line: no-var-requires no-require-imports
-const ansiRegex = require('ansi-regex') as typeof import('ansi-regex');
-const TypeRegex = /^Type:\s+(\w+)$/m;
-const ValueRegex = /^Value:\s+(.*)$/m;
-const StringFormRegex = /^String form:\s+(.*)$/m;
-const DocStringRegex = /^Docstring:\s+(.*)$/m;
-const CountRegex = /^Length:\s+(.*)$/m;
+
+// Regexes for parsing data from Python kernel. Not sure yet if other
+// kernels will add the ansi encoding.
+const TypeRegex = /\u001b\[1;31mType:\u001b\[0m\s+(\w+)/;
+const ValueRegex = /\u001b\[1;31mValue:\u001b\[0m\s+(.*)/;
+const StringFormRegex = /\u001b\[1;31mString form:\u001b\[0m\s+([\s\S]+?)\u001b\[1/;
+const DocStringRegex = /\u001b\[1;31mDocstring:\u001b\[0m\s+(.*)/;
+const CountRegex = /\u001b\[1;31mLength:\u001b\[0m\s+(.*)/;
 const ShapeRegex = /^\s+\[(\d+) rows x (\d+) columns\]/m;
 
 const DataViewableTypes: Set<string> = new Set<string>(['DataFrame', 'list', 'dict', 'np.array', 'Series']);
@@ -35,10 +37,7 @@ export class JupyterVariables implements IJupyterVariables {
     private fetchDataFrameRowsScript?: string;
     private filesLoaded: boolean = false;
     private languageToQueryMap = new Map<string, { query: string; parser: RegExp }>();
-    private ansiRegex: RegExp;
-    constructor(@inject(IFileSystem) private fileSystem: IFileSystem, @inject(IConfigurationService) private configService: IConfigurationService) {
-        this.ansiRegex = ansiRegex();
-    }
+    constructor(@inject(IFileSystem) private fileSystem: IFileSystem, @inject(IConfigurationService) private configService: IConfigurationService) {}
 
     // IJupyterVariables implementation
     public async getVariables(notebook: INotebook): Promise<IJupyterVariable[]> {
@@ -255,7 +254,7 @@ export class JupyterVariables implements IJupyterVariables {
             // Should be a text/plain inside of it (at least IPython does this)
             if (output && output.hasOwnProperty('text/plain')) {
                 // tslint:disable-next-line: no-any
-                const text = stripAnsi((output as any)['text/plain'].toString());
+                const text = (output as any)['text/plain'].toString();
 
                 // Parse into bits
                 const type = TypeRegex.exec(text);
