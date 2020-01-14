@@ -116,7 +116,8 @@ export enum Product {
     black = 16,
     bandit = 17,
     jupyter = 18,
-    ipykernel = 19
+    ipykernel = 19,
+    notebook = 20
 }
 
 export enum ModuleNamePurpose {
@@ -133,8 +134,9 @@ export interface IInstaller {
     translateProductToModuleName(product: Product, purpose: ModuleNamePurpose): string;
 }
 
+// tslint:disable-next-line:no-suspicious-comment
+// TODO(GH-8542): Drop IPathUtils in favor of IFileSystemPathUtils.
 export const IPathUtils = Symbol('IPathUtils');
-
 export interface IPathUtils {
     readonly delimiter: string;
     readonly home: string;
@@ -334,6 +336,12 @@ interface IGatherRule {
     doesNotModify: string[] | number[];
 }
 
+export interface IVariableQuery {
+    language: string;
+    query: string;
+    parseExpr: string;
+}
+
 export interface IDataScienceSettings {
     allowImportFromNotebook: boolean;
     enabled: boolean;
@@ -385,6 +393,7 @@ export interface IDataScienceSettings {
     verboseLogging?: boolean;
     themeMatplotlibPlots?: boolean;
     useWebViewServer?: boolean;
+    variableQueries: IVariableQuery[];
 }
 
 export const IConfigurationService = Symbol('IConfigurationService');

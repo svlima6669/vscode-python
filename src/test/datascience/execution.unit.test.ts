@@ -41,8 +41,8 @@ import { createDeferred } from '../../client/common/utils/async';
 import { Architecture } from '../../client/common/utils/platform';
 import { EXTENSION_ROOT_DIR } from '../../client/constants';
 import { Identifiers, PythonDaemonModule } from '../../client/datascience/constants';
-import { JupyterCommandFactory } from '../../client/datascience/jupyter/jupyterCommand';
-import { JupyterCommandFinder } from '../../client/datascience/jupyter/jupyterCommandFinder';
+import { JupyterCommandFactory } from '../../client/datascience/jupyter/interpreter/jupyterCommand';
+import { JupyterCommandFinder } from '../../client/datascience/jupyter/interpreter/jupyterCommandFinder';
 import { JupyterExecutionFactory } from '../../client/datascience/jupyter/jupyterExecutionFactory';
 import { KernelSelector } from '../../client/datascience/jupyter/kernels/kernelSelector';
 import { LiveKernelModel } from '../../client/datascience/jupyter/kernels/types';
@@ -91,6 +91,10 @@ class MockJupyterNotebook implements INotebook {
     }
     public executeObservable(_code: string, _f: string, _line: number): Observable<ICell[]> {
         throw new Error('Method not implemented');
+    }
+
+    public inspect(_code: string, _cancelToken?: CancellationToken): Promise<JSONObject> {
+        return Promise.resolve({});
     }
 
     public async getCompletion(_cellCode: string, _offsetInCode: number, _cancelToken?: CancellationToken): Promise<INotebookCompletion> {
@@ -775,7 +779,8 @@ suite('Jupyter Execution', async () => {
             allowLiveShare: false,
             enablePlotViewer: true,
             runStartupCommands: '',
-            debugJustMyCode: true
+            debugJustMyCode: true,
+            variableQueries: []
         };
 
         // Service container also needs to generate jupyter servers. However we can't use a mock as that messes up returning

@@ -4,19 +4,19 @@ import { inject, injectable, unmanaged } from 'inversify';
 import * as path from 'path';
 import { CancellationToken, CancellationTokenSource, Progress, ProgressLocation, ProgressOptions } from 'vscode';
 
-import { IApplicationShell, IWorkspaceService } from '../../common/application/types';
-import { Cancellation, createPromiseFromCancellation, wrapCancellationTokens } from '../../common/cancellation';
-import { traceError, traceInfo, traceWarning } from '../../common/logger';
-import { IFileSystem } from '../../common/platform/types';
-import { IProcessService, IProcessServiceFactory, IPythonExecutionFactory, IPythonExecutionService, SpawnOptions } from '../../common/process/types';
-import { IConfigurationService, IDisposableRegistry, ILogger, IPersistentState, IPersistentStateFactory } from '../../common/types';
-import { createDeferred, Deferred } from '../../common/utils/async';
-import * as localize from '../../common/utils/localize';
-import { StopWatch } from '../../common/utils/stopWatch';
-import { IInterpreterService, IKnownSearchPathsForInterpreters, PythonInterpreter } from '../../interpreter/contracts';
-import { sendTelemetryEvent } from '../../telemetry';
-import { JupyterCommands, PythonDaemonModule, RegExpValues, Telemetry } from '../constants';
-import { IJupyterCommand, IJupyterCommandFactory } from '../types';
+import { IApplicationShell, IWorkspaceService } from '../../../common/application/types';
+import { Cancellation, createPromiseFromCancellation, wrapCancellationTokens } from '../../../common/cancellation';
+import { traceError, traceInfo, traceWarning } from '../../../common/logger';
+import { IFileSystem } from '../../../common/platform/types';
+import { IProcessService, IProcessServiceFactory, IPythonExecutionFactory, IPythonExecutionService, SpawnOptions } from '../../../common/process/types';
+import { IConfigurationService, IDisposableRegistry, ILogger, IPersistentState, IPersistentStateFactory } from '../../../common/types';
+import { createDeferred, Deferred } from '../../../common/utils/async';
+import * as localize from '../../../common/utils/localize';
+import { StopWatch } from '../../../common/utils/stopWatch';
+import { IInterpreterService, IKnownSearchPathsForInterpreters, PythonInterpreter } from '../../../interpreter/contracts';
+import { sendTelemetryEvent } from '../../../telemetry';
+import { JupyterCommands, PythonDaemonModule, RegExpValues, Telemetry } from '../../constants';
+import { IJupyterCommand, IJupyterCommandFactory } from '../../types';
 
 export enum ModuleExistsStatus {
     NotFound,
@@ -261,6 +261,13 @@ export class JupyterCommandFinderImpl {
             });
         }
 
+        // Make sure found is set (tests can mess this up when interpreters aren't returned)
+        if (!found) {
+            found = {
+                status: ModuleExistsStatus.NotFound
+            };
+        }
+
         // Set the original error so we
         // can propagate the reason to the user
         if (firstError) {
@@ -359,7 +366,7 @@ export class JupyterCommandFinderImpl {
     private async createExecutionService(interpreter: PythonInterpreter): Promise<IPythonExecutionService> {
         const [currentInterpreter, pythonService] = await Promise.all([
             this.interpreterService.getActiveInterpreter(undefined),
-            this.executionFactory.createActivatedEnvironment({ resource: undefined, interpreter, allowEnvironmentFetchExceptions: true })
+            this.executionFactory.createActivatedEnvironment({ resource: undefined, interpreter, allowEnvironmentFetchExceptions: true, bypassCondaExecution: true })
         ]);
 
         // Use daemons for current interpreter, when using any other interpreter, do not use a daemon.

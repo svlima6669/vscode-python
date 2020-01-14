@@ -4,13 +4,20 @@
 import { SpawnOptions } from 'child_process';
 import { inject, injectable } from 'inversify';
 import * as path from 'path';
-import { traceError } from '../../common/logger';
-import { ExecutionResult, IProcessService, IProcessServiceFactory, IPythonExecutionFactory, IPythonExecutionService, ObservableExecutionResult } from '../../common/process/types';
-import { EXTENSION_ROOT_DIR } from '../../constants';
-import { IEnvironmentActivationService } from '../../interpreter/activation/types';
-import { IInterpreterService, PythonInterpreter } from '../../interpreter/contracts';
-import { JupyterCommands, PythonDaemonModule } from '../constants';
-import { IJupyterCommand, IJupyterCommandFactory } from '../types';
+import { traceError } from '../../../common/logger';
+import {
+    ExecutionResult,
+    IProcessService,
+    IProcessServiceFactory,
+    IPythonExecutionFactory,
+    IPythonExecutionService,
+    ObservableExecutionResult
+} from '../../../common/process/types';
+import { EXTENSION_ROOT_DIR } from '../../../constants';
+import { IEnvironmentActivationService } from '../../../interpreter/activation/types';
+import { IInterpreterService, PythonInterpreter } from '../../../interpreter/contracts';
+import { JupyterCommands, PythonDaemonModule } from '../../constants';
+import { IJupyterCommand, IJupyterCommandFactory } from '../../types';
 
 // JupyterCommand objects represent some process that can be launched that should be guaranteed to work because it
 // was found by testing it previously
@@ -105,7 +112,7 @@ class InterpreterJupyterCommand implements IJupyterCommand {
                     }
                 }
             }
-            return pythonExecutionFactory.createActivatedEnvironment({ interpreter: this._interpreter });
+            return pythonExecutionFactory.createActivatedEnvironment({ interpreter: this._interpreter, bypassCondaExecution: true });
         });
     }
     public interpreter(): Promise<PythonInterpreter | undefined> {
@@ -113,7 +120,7 @@ class InterpreterJupyterCommand implements IJupyterCommand {
     }
 
     public async execObservable(args: string[], options: SpawnOptions): Promise<ObservableExecutionResult<string>> {
-        const newOptions = { ...options };
+        const newOptions = { ...options, extraVariables: { PYTHONWARNINGS: 'ignore' } };
         const launcher = await this.pythonLauncher;
         const newArgs = [...this.args, ...args];
         const moduleName = newArgs[1];
@@ -123,7 +130,7 @@ class InterpreterJupyterCommand implements IJupyterCommand {
     }
 
     public async exec(args: string[], options: SpawnOptions): Promise<ExecutionResult<string>> {
-        const newOptions = { ...options };
+        const newOptions = { ...options, extraVariables: { PYTHONWARNINGS: 'ignore' } };
         const launcher = await this.pythonLauncher;
         const newArgs = [...this.args, ...args];
         const moduleName = newArgs[1];
@@ -209,7 +216,7 @@ export class InterpreterJupyterKernelSpecCommand extends InterpreterJupyterComma
         }
         try {
             // Try getting kernels using python script, if that fails (even if there's output in stderr) rethrow original exception.
-            const activatedEnv = await this.pythonExecutionFactory.createActivatedEnvironment({ interpreter });
+            const activatedEnv = await this.pythonExecutionFactory.createActivatedEnvironment({ interpreter, bypassCondaExecution: true });
             return activatedEnv.exec([path.join(EXTENSION_ROOT_DIR, 'pythonFiles', 'datascience', 'getJupyterKernels.py')], { ...options, throwOnStdErr: true });
         } catch (innerEx) {
             traceError('Failed to get a list of the kernelspec using python script', innerEx);

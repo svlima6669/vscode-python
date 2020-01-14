@@ -2,7 +2,9 @@
 // Licensed under the MIT License.
 'use strict';
 
+import { PYTHON_LANGUAGE } from '../common/constants';
 import { IS_WINDOWS } from '../common/platform/constants';
+import { IVariableQuery } from '../common/types';
 import { NativeCommandType } from './interactive-common/interactiveWindowTypes';
 
 export const DefaultTheme = 'Default Light+';
@@ -186,6 +188,14 @@ export enum Telemetry {
     CodeLensAverageAcquisitionTime = 'DATASCIENCE.CODE_LENS_ACQ_TIME',
     ClassConstructionTime = 'DATASCIENCE.CLASS_CONSTRUCTION_TIME',
     FindJupyterCommand = 'DATASCIENCE.FIND_JUPYTER_COMMAND',
+    /**
+     * Telemetry sent when user selects an interpreter to be used for starting of Jupyter server.
+     */
+    SelectJupyterInterpreter = 'DATASCIENCE.SELECT_JUPYTER_INTERPRETER',
+    /**
+     * User used command to select an intrepreter for the jupyter server.
+     */
+    SelectJupyterInterpreterCommand = 'DATASCIENCE.SELECT_JUPYTER_INTERPRETER_Command',
     StartJupyterProcess = 'DATASCIENCE.START_JUPYTER_PROCESS',
     WaitForIdleJupyter = 'DATASCIENCE.WAIT_FOR_IDLE_JUPYTER',
     HiddenCellTime = 'DATASCIENCE.HIDDEN_EXECUTION_TIME',
@@ -307,6 +317,11 @@ export namespace Settings {
     export const IntellisenseTimeout = 30000;
     export const RemoteDebuggerPortBegin = 8889;
     export const RemoteDebuggerPortEnd = 9000;
+    export const DefaultVariableQuery: IVariableQuery = {
+        language: PYTHON_LANGUAGE,
+        query: '%who_ls',
+        parseExpr: "'(\\w+)'"
+    };
 }
 
 export namespace Identifiers {
@@ -326,10 +341,10 @@ export namespace CodeSnippits {
     export const ChangeDirectory = ['{0}', '{1}', 'import os', 'try:', "\tos.chdir(os.path.join(os.getcwd(), '{2}'))", '\tprint(os.getcwd())', 'except:', '\tpass', ''];
     export const ChangeDirectoryCommentIdentifier = '# ms-python.python added'; // Not translated so can compare.
     export const ImportIPython = '{0}\nfrom IPython import get_ipython\n\n{1}';
-    export const MatplotLibInitSvg = `import matplotlib\n%matplotlib inline\n${Identifiers.MatplotLibDefaultParams} = dict(matplotlib.rcParams)\n%config InlineBackend.figure_formats = 'svg', 'png'`;
-    export const MatplotLibInitPng = `import matplotlib\n%matplotlib inline\n${Identifiers.MatplotLibDefaultParams} = dict(matplotlib.rcParams)\n%config InlineBackend.figure_formats = 'png'`;
-    export const ConfigSvg = `%config InlineBackend.figure_formats = 'svg', 'png'`;
-    export const ConfigPng = `%config InlineBackend.figure_formats = 'png'`;
+    export const MatplotLibInitSvg = `import matplotlib\n%matplotlib inline\n${Identifiers.MatplotLibDefaultParams} = dict(matplotlib.rcParams)\n%config InlineBackend.figure_formats = {'svg', 'png'}`;
+    export const MatplotLibInitPng = `import matplotlib\n%matplotlib inline\n${Identifiers.MatplotLibDefaultParams} = dict(matplotlib.rcParams)\n%config InlineBackend.figure_formats = {'png'}`;
+    export const ConfigSvg = `%config InlineBackend.figure_formats = {'svg', 'png'}`;
+    export const ConfigPng = `%config InlineBackend.figure_formats = {'png'}`;
 }
 
 export enum JupyterCommands {
@@ -369,4 +384,5 @@ export namespace LiveShareCommands {
     export const disposeServer = 'disposeServer';
     export const guestCheck = 'guestCheck';
     export const createNotebook = 'createNotebook';
+    export const inspect = 'inspect';
 }
