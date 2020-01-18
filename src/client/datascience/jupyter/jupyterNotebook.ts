@@ -30,8 +30,8 @@ import {
     ICell,
     ICellHashLogger,
     ICellHashProvider,
-    IGatherExecution,
     IGatherLogger,
+    IGatherProvider,
     IJupyterKernelSpec,
     IJupyterSession,
     INotebook,
@@ -569,7 +569,7 @@ export class JupyterNotebookBase implements INotebook {
         this.kernelChanged.fire(spec);
     }
 
-    public getGatherService(): IGatherExecution | undefined {
+    public getgatherProvider(): IGatherProvider | undefined {
         const gatherLogger: INotebookExecutionLogger | undefined = this._loggers.find((logger: INotebookExecutionLogger) => {
             return (<IGatherLogger>logger).service !== undefined;
         });

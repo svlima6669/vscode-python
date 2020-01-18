@@ -5,11 +5,11 @@ import { concatMultilineStringInput } from '../../../datascience-ui/common';
 import { IConfigurationService } from '../../common/types';
 import { noop } from '../../common/utils/misc';
 import { CellMatcher } from '../cellMatcher';
-import { ICell as IVscCell, IGatherExecution, IGatherLogger } from '../types';
+import { ICell as IVscCell, IGatherLogger, IGatherProvider } from '../types';
 
 @injectable()
 export class GatherLogger implements IGatherLogger {
-    constructor(@inject(IGatherExecution) private gather: IGatherExecution, @inject(IConfigurationService) private configService: IConfigurationService) { }
+    constructor(@inject(IGatherProvider) private gather: IGatherProvider, @inject(IConfigurationService) private configService: IConfigurationService) { }
 
     public async preExecute(_vscCell: IVscCell, _silent: boolean): Promise<void> {
         // This function is just implemented here for compliance with the INotebookExecutionLogger interface

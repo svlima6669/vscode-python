@@ -16,7 +16,6 @@ import { CodeLensFactory } from '../../../client/datascience/editor-integration/
 import { DataScienceCodeLensProvider } from '../../../client/datascience/editor-integration/codelensprovider';
 import { CodeWatcher } from '../../../client/datascience/editor-integration/codewatcher';
 import {
-    ICellHashProvider,
     ICodeWatcher,
     IDataScienceErrorHandler,
     IDebugLocationTracker,

@@ -192,7 +192,7 @@ import {
     IDataViewer,
     IDataViewerProvider,
     IDebugLocationTracker,
-    IGatherExecution,
+    IGatherProvider,
     IInteractiveWindow,
     IInteractiveWindowListener,
     IInteractiveWindowProvider,
@@ -475,7 +475,7 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
         this.serviceManager.add<IInteractiveWindowListener>(IInteractiveWindowListener, GatherListener);
         this.serviceManager.addBinding(ICellHashProvider, INotebookExecutionLogger);
         this.serviceManager.addBinding(IJupyterDebugger, ICellHashListener);
-        this.serviceManager.add<IGatherExecution>(IGatherExecution, GatherExecution);
+        this.serviceManager.add<IGatherProvider>(IGatherProvider, GatherExecution);
         this.serviceManager.addSingleton<ICodeLensFactory>(ICodeLensFactory, CodeLensFactory);
         this.serviceManager.addSingleton<IShellDetector>(IShellDetector, TerminalNameShellDetector);
         this.serviceManager.addSingleton<InterpeterHashProviderFactory>(InterpeterHashProviderFactory, InterpeterHashProviderFactory);

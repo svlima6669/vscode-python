@@ -79,8 +79,8 @@ import {
     IDataViewer,
     IDataViewerProvider,
     IDebugLocationTracker,
-    IGatherExecution,
     IGatherLogger,
+    IGatherProvider,
     IInteractiveWindow,
     IInteractiveWindowListener,
     IInteractiveWindowProvider,
@@ -142,7 +142,7 @@ export function registerTypes(serviceManager: IServiceManager) {
     serviceManager.addBinding(ICellHashLogger, INotebookExecutionLogger);
     serviceManager.addBinding(ICellHashProvider, IInteractiveWindowListener);
 
-    serviceManager.add<IGatherExecution>(IGatherExecution, GatherExecution);
+    serviceManager.add<IGatherProvider>(IGatherProvider, GatherExecution);
     serviceManager.add<IGatherLogger>(IGatherLogger, GatherLogger);
     serviceManager.addBinding(IGatherLogger, INotebookExecutionLogger);
 

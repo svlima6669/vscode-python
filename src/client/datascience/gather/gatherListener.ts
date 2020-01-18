@@ -11,23 +11,14 @@ import { noop } from '../../common/utils/misc';
 import { generateCellsFromString } from '../cellFactory';
 import { Identifiers } from '../constants';
 import { IInteractiveWindowMapping, InteractiveWindowMessages } from '../interactive-common/interactiveWindowTypes';
-import {
-    ICell,
-    IGatherExecution,
-    IInteractiveWindowListener,
-    IInteractiveWindowProvider,
-    IJupyterExecution,
-    INotebook,
-    INotebookEditorProvider,
-    INotebookExporter
-} from '../types';
+import { ICell, IGatherProvider, IInteractiveWindowListener, IInteractiveWindowProvider, IJupyterExecution, INotebook, INotebookEditorProvider, INotebookExporter } from '../types';
 
 @injectable()
 export class GatherListener implements IInteractiveWindowListener {
     // tslint:disable-next-line: no-any
     private postEmitter: EventEmitter<{ message: string; payload: any }> = new EventEmitter<{ message: string; payload: any }>();
     private notebookUri: Uri | undefined;
-    private gatherService: IGatherExecution | undefined;
+    private gatherProvider: IGatherProvider | undefined;
 
     constructor(
         @inject(IApplicationShell) private applicationShell: IApplicationShell,
@@ -61,8 +52,8 @@ export class GatherListener implements IInteractiveWindowListener {
                 break;
 
             case InteractiveWindowMessages.RestartKernel:
-                if (this.gatherService) {
-                    this.gatherService.resetLog();
+                if (this.gatherProvider) {
+                    this.gatherProvider.resetLog();
                 }
                 break;
 
@@ -100,13 +91,13 @@ export class GatherListener implements IInteractiveWindowListener {
 
             // If we have an executing notebook, get its gather execution service.
             if (nb) {
-                this.gatherService = nb.getGatherService();
+                this.gatherProvider = nb.getgatherProvider();
             }
         }
     }
 
     private gatherCodeInternal = async (cell: ICell) => {
-        const slicedProgram = this.gatherService ? this.gatherService.gatherCode(cell) : '';
+        const slicedProgram = this.gatherProvider ? this.gatherProvider.gatherCode(cell) : '';
 
         if (this.configService.getSettings().datascience.gatherToScript) {
             await this.showFile(slicedProgram, cell.file);

@@ -9,13 +9,13 @@ import * as localize from '../../common/utils/localize';
 // tslint:disable-next-line: no-duplicate-imports
 import { Common } from '../../common/utils/localize';
 import { Identifiers } from '../constants';
-import { CellState, ICell as IVscCell, IGatherExecution } from '../types';
+import { CellState, ICell as IVscCell, IGatherProvider } from '../types';
 
 /**
  * An adapter class to wrap the code gathering functionality from [microsoft/python-program-analysis](https://www.npmjs.com/package/@msrvida/python-program-analysis).
  */
 @injectable()
-export class GatherExecution implements IGatherExecution {
+export class GatherExecution implements IGatherProvider {
     private _executionSlicer: ExecutionLogSlicer<IGatherCell>;
     private dataflowAnalyzer: DataflowAnalyzer;
     private _enabled: boolean;

@@ -51,7 +51,7 @@ import {
     ICell,
     ICellHashProvider,
     IConnection,
-    IGatherExecution,
+    IGatherProvider,
     IJupyterKernelSpec,
     IJupyterSubCommandExecutionService,
     INotebook,
@@ -152,7 +152,7 @@ class MockJupyterNotebook implements INotebook {
         return Promise.resolve();
     }
 
-    public getGatherService(): IGatherExecution | undefined {
+    public getgatherProvider(): IGatherProvider | undefined {
         return;
     }
 
