@@ -10,6 +10,8 @@ import * as path from 'path';
 import * as uuid from 'uuid/v4';
 import { Event, EventEmitter, Memento, TextEditor, Uri, ViewColumn } from 'vscode';
 
+import { concatMultilineStringInput, splitMultilineString } from '../../../datascience-ui/common';
+import { createCodeCell, createErrorOutput } from '../../../datascience-ui/common/cellFactory';
 import { IApplicationShell, ICommandManager, IDocumentManager, ILiveShareApi, IWebPanelProvider, IWorkspaceService } from '../../common/application/types';
 import { ContextKey } from '../../common/contextKey';
 import { traceError } from '../../common/logger';
@@ -22,11 +24,11 @@ import { StopWatch } from '../../common/utils/stopWatch';
 import { EXTENSION_ROOT_DIR } from '../../constants';
 import { IInterpreterService } from '../../interpreter/contracts';
 import { captureTelemetry, sendTelemetryEvent } from '../../telemetry';
-import { concatMultilineStringInput, splitMultilineString } from '../common';
 import { EditorContexts, Identifiers, NativeKeyboardCommandTelemetryLookup, NativeMouseCommandTelemetryLookup, Telemetry } from '../constants';
 import { InteractiveBase } from '../interactive-common/interactiveBase';
 import { IEditCell, IInsertCell, INativeCommand, InteractiveWindowMessages, IRemoveCell, ISaveAll, ISubmitNewCell, ISwapCells } from '../interactive-common/interactiveWindowTypes';
 import { InvalidNotebookFileError } from '../jupyter/invalidNotebookFileError';
+import { ProgressReporter } from '../progress/progressReporter';
 import {
     CellState,
     ICell,
@@ -62,6 +64,10 @@ const NotebookTransferKey = 'notebook-transfered';
 
 @injectable()
 export class NativeEditor extends InteractiveBase implements INotebookEditor {
+    public get onDidChangeViewState(): Event<void> {
+        return this._onDidChangeViewState.event;
+    }
+    private _onDidChangeViewState = new EventEmitter<void>();
     private closedEvent: EventEmitter<INotebookEditor> = new EventEmitter<INotebookEditor>();
     private executedEvent: EventEmitter<INotebookEditor> = new EventEmitter<INotebookEditor>();
     private modifiedEvent: EventEmitter<INotebookEditor> = new EventEmitter<INotebookEditor>();
@@ -104,9 +110,11 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
         @inject(IMemento) @named(GLOBAL_MEMENTO) globalStorage: Memento,
         @inject(IMemento) @named(WORKSPACE_MEMENTO) private localStorage: Memento,
         @inject(ICryptoUtils) private crypto: ICryptoUtils,
-        @inject(IExtensionContext) private context: IExtensionContext
+        @inject(IExtensionContext) private context: IExtensionContext,
+        @inject(ProgressReporter) progressReporter: ProgressReporter
     ) {
         super(
+            progressReporter,
             listeners,
             liveShare,
             applicationShell,
@@ -395,18 +403,7 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
             // Make this error our cell output
             this.sendCellsToWebView([
                 {
-                    data: {
-                        source: info.code,
-                        cell_type: 'code',
-                        outputs: [
-                            {
-                                output_type: 'error',
-                                evalue: exc.toString()
-                            }
-                        ],
-                        metadata: {},
-                        execution_count: null
-                    },
+                    data: createCodeCell([info.code], [createErrorOutput(exc)]),
                     id: info.id,
                     file: Identifiers.EmptyFileName,
                     line: 0,
@@ -482,6 +479,7 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
         // Update our contexts
         const interactiveContext = new ContextKey(EditorContexts.HaveNative, this.commandManager);
         interactiveContext.set(visible && active).catch();
+        this._onDidChangeViewState.fire();
     }
 
     protected async closeBecauseOfFailure(_exc: Error): Promise<void> {
@@ -596,13 +594,7 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
                 line: 0,
                 file: Identifiers.EmptyFileName,
                 state: CellState.finished,
-                data: {
-                    cell_type: 'code',
-                    outputs: [],
-                    source: [],
-                    metadata: {},
-                    execution_count: null
-                }
+                data: createCodeCell()
             };
             cells.splice(0, 0, defaultCell);
             forceDirty = true;

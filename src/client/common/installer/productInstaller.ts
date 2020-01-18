@@ -74,17 +74,19 @@ export abstract class BaseInstaller {
     }
 
     public async isInstalled(product: Product, resource?: InterpreterUri): Promise<boolean | undefined> {
-        if (product === Product.unittest || product === Product.jupyter || product === Product.notebook) {
+        if (product === Product.unittest) {
             return true;
         }
         // User may have customized the module name or provided the fully qualified path.
-        const pythonPath = isResource(resource) ? undefined : resource.path;
+        const interpreter = isResource(resource) ? undefined : resource;
         const uri = isResource(resource) ? resource : undefined;
         const executableName = this.getExecutableNameFromSettings(product, uri);
 
         const isModule = this.isExecutableAModule(product, uri);
         if (isModule) {
-            const pythonProcess = await this.serviceContainer.get<IPythonExecutionFactory>(IPythonExecutionFactory).create({ resource: uri, pythonPath });
+            const pythonProcess = await this.serviceContainer
+                .get<IPythonExecutionFactory>(IPythonExecutionFactory)
+                .createActivatedEnvironment({ resource: uri, interpreter, allowEnvironmentFetchExceptions: true });
             return pythonProcess.isModuleInstalled(executableName);
         } else {
             const process = await this.serviceContainer.get<IProcessServiceFactory>(IProcessServiceFactory).create(uri);
@@ -327,6 +329,7 @@ export class ProductInstaller implements IInstaller {
     }
 }
 
+// tslint:disable-next-line: cyclomatic-complexity
 function translateProductToModule(product: Product, purpose: ModuleNamePurpose): string {
     switch (product) {
         case Product.mypy:
@@ -366,6 +369,10 @@ function translateProductToModule(product: Product, purpose: ModuleNamePurpose):
             return 'notebook';
         case Product.ipykernel:
             return 'ipykernel';
+        case Product.nbconvert:
+            return 'nbconvert';
+        case Product.kernelspec:
+            return 'kernelspec';
         default: {
             throw new Error(`Product ${product} cannot be installed as a Python Module.`);
         }

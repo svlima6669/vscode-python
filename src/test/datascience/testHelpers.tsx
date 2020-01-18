@@ -24,7 +24,7 @@ import { ImageButton } from '../../datascience-ui/react-common/imageButton';
 import { MonacoEditor } from '../../datascience-ui/react-common/monacoEditor';
 import { noop } from '../core';
 import { DataScienceIocContainer } from './dataScienceIocContainer';
-import { createInputEvent, createKeyboardEvent, waitForUpdate } from './reactHelpers';
+import { createInputEvent, createKeyboardEvent } from './reactHelpers';
 
 //tslint:disable:trailing-comma no-any no-multiline-string
 export enum CellInputState {
@@ -404,14 +404,14 @@ export function verifyLastCellInputState(wrapper: ReactWrapper<any, Readonly<{}>
 }
 
 export async function getCellResults(
+    ioc: DataScienceIocContainer,
     wrapper: ReactWrapper<any, Readonly<{}>, React.Component>,
-    mainClass: React.ComponentClass<any>,
     cellType: string,
-    expectedRenders: number,
-    updater: () => Promise<void>
+    updater: () => Promise<void>,
+    renderPromiseGenerator?: () => Promise<void>
 ): Promise<ReactWrapper<any, Readonly<{}>, React.Component>> {
     // Get a render promise with the expected number of renders
-    const renderPromise = waitForUpdate(wrapper, mainClass, expectedRenders);
+    const renderPromise = renderPromiseGenerator ? renderPromiseGenerator() : waitForMessage(ioc, InteractiveWindowMessages.ExecutionRendered);
 
     // Call our function to update the react control
     await updater();
@@ -419,11 +419,14 @@ export async function getCellResults(
     // Wait for all of the renders to go through
     await renderPromise;
 
+    // Update wrapper so that it gets the latest values.
+    wrapper.update();
+
     // Return the result
     return wrapper.find(cellType);
 }
 
-export function simulateKey(domNode: HTMLTextAreaElement, key: string, shiftDown?: boolean, ctrlKey?: boolean) {
+export function simulateKey(domNode: HTMLTextAreaElement, key: string, shiftDown?: boolean, ctrlKey?: boolean, altKey?: boolean, metaKey?: boolean) {
     // Submit a keypress into the textarea. Simulate doesn't work here because the keydown
     // handler is not registered in any react code. It's being handled with DOM events
 
@@ -436,15 +439,15 @@ export function simulateKey(domNode: HTMLTextAreaElement, key: string, shiftDown
     // 1) keydown
     // 2) keypress
     // 3) keyup
-    let event = createKeyboardEvent('keydown', { key, code: key, shiftKey: shiftDown, ctrlKey });
+    let event = createKeyboardEvent('keydown', { key, code: key, shiftKey: shiftDown, ctrlKey, altKey, metaKey });
 
     // Dispatch. Result can be swallowed. If so skip the next event.
     let result = domNode.dispatchEvent(event);
     if (result) {
-        event = createKeyboardEvent('keypress', { key, code: key, shiftKey: shiftDown, ctrlKey });
+        event = createKeyboardEvent('keypress', { key, code: key, shiftKey: shiftDown, ctrlKey, altKey, metaKey });
         result = domNode.dispatchEvent(event);
         if (result) {
-            event = createKeyboardEvent('keyup', { key, code: key, shiftKey: shiftDown, ctrlKey });
+            event = createKeyboardEvent('keyup', { key, code: key, shiftKey: shiftDown, ctrlKey, altKey, metaKey });
             domNode.dispatchEvent(event);
 
             // Update our value. This will reset selection to zero.
@@ -476,9 +479,9 @@ async function submitInput(ioc: DataScienceIocContainer, textArea: HTMLTextAreaE
     return renderPromise;
 }
 
-function enterKey(textArea: HTMLTextAreaElement, key: string) {
+function enterKey(textArea: HTMLTextAreaElement, key: string, shiftDown?: boolean, ctrlKey?: boolean, altKey?: boolean, metaKey?: boolean) {
     // Simulate a key press
-    simulateKey(textArea, key);
+    simulateKey(textArea, key, shiftDown, ctrlKey, altKey, metaKey);
 }
 
 export function getInteractiveEditor(wrapper: ReactWrapper<any, Readonly<{}>, React.Component>): ReactWrapper<any, Readonly<{}>, React.Component> {
@@ -523,18 +526,21 @@ export function injectCode(editorControl: ReactWrapper<any, Readonly<{}>, React.
     return textArea;
 }
 
+export function enterEditorKey(
+    editorControl: ReactWrapper<any, Readonly<{}>, React.Component> | undefined,
+    keyboardEvent: Partial<IKeyboardEvent> & { code: string }
+): HTMLTextAreaElement | null {
+    const textArea = getTextArea(editorControl);
+    assert.ok(textArea!, 'Cannot find the textarea inside the monaco editor');
+    textArea!.focus();
+
+    enterKey(textArea!, keyboardEvent.code, keyboardEvent.shiftKey, keyboardEvent.ctrlKey, keyboardEvent.altKey, keyboardEvent.metaKey);
+
+    return textArea;
+}
+
 export function typeCode(editorControl: ReactWrapper<any, Readonly<{}>, React.Component> | undefined, code: string): HTMLTextAreaElement | null {
-    // Find the last cell. It should have a monacoEditor object. We need to search
-    // through its DOM to find the actual textarea to send input to
-    // (we can't actually find it with the enzyme wrappers because they only search
-    //  React accessible nodes and the monaco html is not react)
-    assert.ok(editorControl, 'Editor not defined in order to type code into');
-    let ecDom = editorControl!.getDOMNode();
-    if ((ecDom as any).length) {
-        ecDom = (ecDom as any)[0];
-    }
-    assert.ok(ecDom, 'ec DOM object not found');
-    const textArea = ecDom!.querySelector('.overflow-guard')!.querySelector('textarea');
+    const textArea = getTextArea(editorControl);
     assert.ok(textArea!, 'Cannot find the textarea inside the monaco editor');
     textArea!.focus();
 
@@ -548,6 +554,20 @@ export function typeCode(editorControl: ReactWrapper<any, Readonly<{}>, React.Co
     }
 
     return textArea;
+}
+
+function getTextArea(editorControl: ReactWrapper<any, Readonly<{}>, React.Component> | undefined): HTMLTextAreaElement | null {
+    // Find the last cell. It should have a monacoEditor object. We need to search
+    // through its DOM to find the actual textarea to send input to
+    // (we can't actually find it with the enzyme wrappers because they only search
+    //  React accessible nodes and the monaco html is not react)
+    assert.ok(editorControl, 'Editor not defined in order to type code into');
+    let ecDom = editorControl!.getDOMNode();
+    if ((ecDom as any).length) {
+        ecDom = (ecDom as any)[0];
+    }
+    assert.ok(ecDom, 'ec DOM object not found');
+    return ecDom!.querySelector('.overflow-guard')!.querySelector('textarea');
 }
 
 export async function enterInput(

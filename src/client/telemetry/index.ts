@@ -1133,6 +1133,22 @@ export interface IEventNamePropertyMapping {
         error?: string;
     };
     /**
+     * Telemetry event sent when LS is started for workspace (workspace folder in case of multi-root)
+     */
+    [EventName.PYTHON_NODE_SERVER_ENABLED]: never | undefined;
+    /**
+     * Telemetry event sent when Node.js server is ready to start
+     */
+    [EventName.PYTHON_NODE_SERVER_READY]: never | undefined;
+    /**
+     * Telemetry event sent when starting Node.js server
+     */
+    [EventName.PYTHON_NODE_SERVER_STARTUP]: never | undefined;
+    /**
+     * Telemetry sent from Node.js server (details of telemetry sent can be provided by LS team)
+     */
+    [EventName.PYTHON_NODE_SERVER_TELEMETRY]: any;
+    /**
      * Telemetry captured for enabling reload.
      */
     [EventName.PYTHON_WEB_APP_RELOAD]: {
@@ -1495,6 +1511,13 @@ export interface IEventNamePropertyMapping {
     [Telemetry.ShowHistoryPane]: never | undefined;
     [Telemetry.StartJupyter]: never | undefined;
     [Telemetry.StartJupyterProcess]: never | undefined;
+    /**
+     * Telemetry event sent when jupyter has been found in interpreter but we cannot find kernelspec.
+     *
+     * @type {(never | undefined)}
+     * @memberof IEventNamePropertyMapping
+     */
+    [Telemetry.JupyterInstalledButNotKernelSpecModule]: never | undefined;
     [Telemetry.JupyterStartTimeout]: {
         /**
          * Total time spent in attempting to start and connect to jupyter before giving up.

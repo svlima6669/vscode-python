@@ -3,7 +3,6 @@
 'use strict';
 import { JSONObject } from '@phosphor/coreutils/lib/json';
 import { assert } from 'chai';
-import { ChildProcess } from 'child_process';
 import * as fs from 'fs-extra';
 import * as os from 'os';
 import * as path from 'path';
@@ -25,7 +24,6 @@ import { PersistentState, PersistentStateFactory } from '../../client/common/per
 import { FileSystem } from '../../client/common/platform/fileSystem';
 import { IFileSystem, TemporaryFile } from '../../client/common/platform/types';
 import { ProcessServiceFactory } from '../../client/common/process/processFactory';
-import { PythonDaemonExecutionService } from '../../client/common/process/pythonDaemon';
 import { PythonExecutionFactory } from '../../client/common/process/pythonExecutionFactory';
 import {
     ExecutionResult,
@@ -43,6 +41,7 @@ import { EXTENSION_ROOT_DIR } from '../../client/constants';
 import { Identifiers, PythonDaemonModule } from '../../client/datascience/constants';
 import { JupyterCommandFactory } from '../../client/datascience/jupyter/interpreter/jupyterCommand';
 import { JupyterCommandFinder } from '../../client/datascience/jupyter/interpreter/jupyterCommandFinder';
+import { JupyterCommandFinderInterpreterExecutionService } from '../../client/datascience/jupyter/interpreter/jupyterCommandInterpreterExecutionService';
 import { JupyterExecutionFactory } from '../../client/datascience/jupyter/jupyterExecutionFactory';
 import { KernelSelector } from '../../client/datascience/jupyter/kernels/kernelSelector';
 import { LiveKernelModel } from '../../client/datascience/jupyter/kernels/types';
@@ -54,6 +53,7 @@ import {
     IConnection,
     IGatherExecution,
     IJupyterKernelSpec,
+    IJupyterSubCommandExecutionService,
     INotebook,
     INotebookCompletion,
     INotebookServer,
@@ -845,14 +845,14 @@ suite('Jupyter Execution', async () => {
             path: ''
         };
         when(kernelSelector.getKernelForLocalConnection(anything(), anything(), anything())).thenResolve({ kernelSpec });
-        notebookStarter = new NotebookStarter(
-            instance(executionFactory),
+        const jupyterCmdExecutionService = new JupyterCommandFinderInterpreterExecutionService(
             commandFinder,
-            instance(fileSystem),
-            instance(serviceContainer),
             instance(interpreterService),
-            instance(jupyterOutputChannel)
+            instance(fileSystem),
+            instance(executionFactory)
         );
+        when(serviceContainer.get<IJupyterSubCommandExecutionService>(IJupyterSubCommandExecutionService)).thenReturn(jupyterCmdExecutionService);
+        notebookStarter = new NotebookStarter(jupyterCmdExecutionService, instance(fileSystem), instance(serviceContainer), instance(jupyterOutputChannel));
         when(serviceContainer.get<KernelSelector>(KernelSelector)).thenReturn(instance(kernelSelector));
         when(serviceContainer.get<NotebookStarter>(NotebookStarter)).thenReturn(notebookStarter);
         return {
@@ -860,7 +860,6 @@ suite('Jupyter Execution', async () => {
             jupyterExecutionFactory: new JupyterExecutionFactory(
                 instance(liveShare),
                 instance(interpreterService),
-                instance(logger),
                 disposableRegistry,
                 disposableRegistry,
                 instance(fileSystem),
@@ -907,21 +906,6 @@ suite('Jupyter Execution', async () => {
         const execution = createExecution(missingNotebookPython);
         when(interpreterService.getInterpreters()).thenResolve([missingNotebookPython, missingNotebookPython2]);
         await assert.isRejected(execution.connectToNotebookServer(), 'cant exec');
-    }).timeout(10000);
-
-    test('Slow notebook startups throws exception', async () => {
-        const daemonService = mock(PythonDaemonExecutionService);
-        const stdErr = 'Failure';
-        const proc = ({ on: noop } as any) as ChildProcess;
-        const out = new Observable<Output<string>>(s => s.next({ source: 'stderr', out: stdErr }));
-        when(daemonService.execModuleObservable(anything(), anything(), anything())).thenReturn({ dispose: noop, proc: proc, out });
-        when(executionFactory.createDaemon(deepEqual({ daemonModule: PythonDaemonModule, pythonPath: workingPython.path }))).thenResolve(instance(daemonService));
-
-        const execution = createExecution(workingPython, [stdErr]);
-        await assert.isRejected(
-            execution.connectToNotebookServer(),
-            `Jupyter notebook failed to launch. \r\nError: The Jupyter notebook server failed to launch in time\n${stdErr}`
-        );
     }).timeout(10000);
 
     test('Other than active works', async () => {

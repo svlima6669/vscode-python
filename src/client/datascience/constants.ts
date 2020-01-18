@@ -79,10 +79,12 @@ export namespace EditorContexts {
     export const HaveInteractiveCells = 'python.datascience.haveinteractivecells';
     export const HaveRedoableCells = 'python.datascience.haveredoablecells';
     export const HaveInteractive = 'python.datascience.haveinteractive';
+    export const IsInteractive = 'python.datascience.isinteractive';
     export const OwnsSelection = 'python.datascience.ownsSelection';
     export const HaveNativeCells = 'python.datascience.havenativecells';
     export const HaveNativeRedoableCells = 'python.datascience.havenativeredoablecells';
     export const HaveNative = 'python.datascience.havenative';
+    export const IsNative = 'python.datascience.isnative';
     export const HaveCellSelected = 'python.datascience.havecellselected';
 }
 
@@ -210,6 +212,7 @@ export enum Telemetry {
     WebviewMonacoStyleUpdate = 'DATASCIENCE.WEBVIEW_MONACO_STYLE_UPDATE',
     DataViewerFetchTime = 'DATASCIENCE.DATAVIEWER_FETCH_TIME',
     FindJupyterKernelSpec = 'DATASCIENCE.FIND_JUPYTER_KERNEL_SPEC',
+    JupyterInstalledButNotKernelSpecModule = 'DATASCIENCE.JUPYTER_INTALLED_BUT_NO_KERNELSPEC_MODULE',
     PtvsdPromptToInstall = 'DATASCIENCE.PTVSD_PROMPT_TO_INSTALL',
     PtvsdSuccessfullyInstalled = 'DATASCIENCE.PTVSD_SUCCESSFULLY_INSTALLED',
     PtvsdInstallFailed = 'DATASCIENCE.PTVSD_INSTALL_FAILED',
@@ -319,7 +322,7 @@ export namespace Settings {
     export const RemoteDebuggerPortEnd = 9000;
     export const DefaultVariableQuery: IVariableQuery = {
         language: PYTHON_LANGUAGE,
-        query: '%who_ls',
+        query: '_rwho_ls = %who_ls\nprint(_rwho_ls)',
         parseExpr: "'(\\w+)'"
     };
 }

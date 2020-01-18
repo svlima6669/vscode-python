@@ -11,8 +11,8 @@ import { PythonInterpreter } from '../../interpreter/contracts';
 import { IServiceContainer } from '../../ioc/types';
 import { captureTelemetry } from '../../telemetry';
 import { EventName } from '../../telemetry/constants';
-import { ILanguageServerAnalysisOptions, ILanguageServerExtension, ILanguageServerManager, ILanguageServerProxy } from '../types';
-import { LanguageClientMiddleware } from './languageClientMiddleware';
+import { LanguageClientMiddleware } from '../languageClientMiddleware';
+import { ILanguageServerAnalysisOptions, ILanguageServerExtension, ILanguageServerManager, ILanguageServerProxy, LanguageServerType } from '../types';
 
 @injectable()
 export class LanguageServerManager implements ILanguageServerManager {
@@ -82,7 +82,7 @@ export class LanguageServerManager implements ILanguageServerManager {
     @captureTelemetry(EventName.PYTHON_LANGUAGE_SERVER_STARTUP, undefined, true)
     @traceDecorators.verbose('Starting Language Server')
     protected async startLanguageServer(): Promise<void> {
-        this.languageServerProxy = this.serviceContainer.get<ILanguageServerProxy>(ILanguageServerProxy);
+        this.languageServerProxy = this.serviceContainer.get<ILanguageServerProxy>(ILanguageServerProxy, LanguageServerType.Microsoft);
         const options = await this.analysisOptions!.getAnalysisOptions();
         options.middleware = this.middleware = new LanguageClientMiddleware(this.surveyBanner);
 

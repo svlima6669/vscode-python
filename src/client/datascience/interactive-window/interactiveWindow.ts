@@ -17,6 +17,7 @@ import { captureTelemetry, sendTelemetryEvent } from '../../telemetry';
 import { EditorContexts, Identifiers, Telemetry } from '../constants';
 import { InteractiveBase } from '../interactive-common/interactiveBase';
 import { InteractiveWindowMessages, ISubmitNewCell } from '../interactive-common/interactiveWindowTypes';
+import { ProgressReporter } from '../progress/progressReporter';
 import {
     ICell,
     ICodeCssGenerator,
@@ -40,6 +41,16 @@ const historyReactDir = path.join(EXTENSION_ROOT_DIR, 'out', 'datascience-ui', '
 
 @injectable()
 export class InteractiveWindow extends InteractiveBase implements IInteractiveWindow {
+    public get onDidChangeViewState(): Event<void> {
+        return this._onDidChangeViewState.event;
+    }
+    private _onDidChangeViewState = new EventEmitter<void>();
+    public get visible(): boolean {
+        return this.viewState.visible;
+    }
+    public get active(): boolean {
+        return this.viewState.active;
+    }
     private closedEvent: EventEmitter<IInteractiveWindow> = new EventEmitter<IInteractiveWindow>();
     private waitingForExportCells: boolean = false;
     private trackedJupyterStart: boolean = false;
@@ -69,9 +80,11 @@ export class InteractiveWindow extends InteractiveBase implements IInteractiveWi
         @inject(INotebookEditorProvider) editorProvider: INotebookEditorProvider,
         @inject(IDataScienceErrorHandler) errorHandler: IDataScienceErrorHandler,
         @inject(IPersistentStateFactory) private readonly stateFactory: IPersistentStateFactory,
-        @inject(IMemento) @named(GLOBAL_MEMENTO) globalStorage: Memento
+        @inject(IMemento) @named(GLOBAL_MEMENTO) globalStorage: Memento,
+        @inject(ProgressReporter) progressReporter: ProgressReporter
     ) {
         super(
+            progressReporter,
             listeners,
             liveShare,
             applicationShell,
@@ -217,6 +230,10 @@ export class InteractiveWindow extends InteractiveBase implements IInteractiveWi
     @captureTelemetry(Telemetry.ScrolledToCell)
     public scrollToCell(id: string): void {
         this.postMessage(InteractiveWindowMessages.ScrollToCell, { id }).ignoreErrors();
+    }
+    protected async onViewStateChanged(visible: boolean, active: boolean) {
+        super.onViewStateChanged(visible, active);
+        this._onDidChangeViewState.fire();
     }
 
     @captureTelemetry(Telemetry.SubmitCellThroughInput, undefined, false)

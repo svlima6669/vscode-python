@@ -7,9 +7,8 @@ import { injectable, unmanaged } from 'inversify';
 import * as os from 'os';
 import * as path from 'path';
 import * as uuid from 'uuid/v4';
-import { ConfigurationTarget, Event, EventEmitter, Memento, Position, Range, Selection, TextEditor, Uri, ViewColumn } from 'vscode';
+import { CancellationToken, ConfigurationTarget, Event, EventEmitter, Memento, Position, Range, Selection, TextEditor, Uri, ViewColumn } from 'vscode';
 import { Disposable } from 'vscode-jsonrpc';
-import * as vsls from 'vsls/vscode';
 
 import { ServerStatus } from '../../../datascience-ui/interactive-common/mainState';
 import { IApplicationShell, ICommandManager, IDocumentManager, ILiveShareApi, IWebPanelProvider, IWorkspaceService } from '../../common/application/types';
@@ -20,7 +19,6 @@ import { IFileSystem } from '../../common/platform/types';
 import { IConfigurationService, IDisposableRegistry } from '../../common/types';
 import { createDeferred, Deferred } from '../../common/utils/async';
 import * as localize from '../../common/utils/localize';
-import { StopWatch } from '../../common/utils/stopWatch';
 import { IInterpreterService, PythonInterpreter } from '../../interpreter/contracts';
 import { captureTelemetry, sendTelemetryEvent } from '../../telemetry';
 import { generateCellRangesFromDocument } from '../cellFactory';
@@ -45,6 +43,7 @@ import { JupyterSelfCertsError } from '../jupyter/jupyterSelfCertsError';
 import { JupyterKernelPromiseFailedError } from '../jupyter/kernels/jupyterKernelPromiseFailedError';
 import { LiveKernelModel } from '../jupyter/kernels/types';
 import { CssMessages } from '../messages';
+import { ProgressReporter } from '../progress/progressReporter';
 import {
     CellState,
     ICell,
@@ -58,8 +57,8 @@ import {
     IJupyterDebugger,
     IJupyterExecution,
     IJupyterKernelSpec,
-    IJupyterVariable,
     IJupyterVariables,
+    IJupyterVariablesRequest,
     IJupyterVariablesResponse,
     IMessageCell,
     INotebook,
@@ -82,8 +81,6 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
     private _notebook: INotebook | undefined;
     private _id: string;
     private executeEvent: EventEmitter<string> = new EventEmitter<string>();
-    private variableRequestStopWatch: StopWatch | undefined;
-    private variableRequestPendingCount: number = 0;
     private loadPromise: Promise<void> | undefined;
     private setDarkPromise: Deferred<boolean> | undefined;
     public get notebook(): INotebook | undefined {
@@ -91,8 +88,9 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
     }
 
     constructor(
+        @unmanaged() private readonly progressReporter: ProgressReporter,
         @unmanaged() private readonly listeners: IInteractiveWindowListener[],
-        @unmanaged() private liveShare: ILiveShareApi,
+        @unmanaged() liveShare: ILiveShareApi,
         @unmanaged() protected applicationShell: IApplicationShell,
         @unmanaged() protected documentManager: IDocumentManager,
         @unmanaged() private interpreterService: IInterpreterService,
@@ -252,10 +250,6 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
 
             case InteractiveWindowMessages.GetVariablesRequest:
                 this.handleMessage(message, payload, this.requestVariables);
-                break;
-
-            case InteractiveWindowMessages.GetVariableValueRequest:
-                this.handleMessage(message, payload, this.requestVariableValue);
                 break;
 
             case InteractiveWindowMessages.LoadTmLanguageRequest:
@@ -741,17 +735,14 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
 
     private async startServerImpl(): Promise<void> {
         // Status depends upon if we're about to connect to existing server or not.
-        const status = (await this.jupyterExecution.getServer(await this.getNotebookOptions()))
-            ? this.setStatus(localize.DataScience.connectingToJupyter(), true)
-            : this.setStatus(localize.DataScience.startingJupyter(), true);
+        const progressReporter = (await this.jupyterExecution.getServer(await this.getNotebookOptions()))
+            ? this.progressReporter.createProgressIndicator(localize.DataScience.connectingToJupyter())
+            : this.progressReporter.createProgressIndicator(localize.DataScience.startingJupyter());
 
         // Check to see if we support ipykernel or not
         try {
             const usable = await this.checkUsable();
             if (!usable) {
-                // Not loading anymore
-                status.dispose();
-
                 // Indicate failing.
                 throw new JupyterInstallError(
                     localize.DataScience.jupyterNotSupported().format(await this.jupyterExecution.getNotebookError()),
@@ -759,8 +750,13 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
                 );
             }
             // Then load the jupyter server
-            await this.createNotebook();
+            await this.createNotebook(progressReporter.token);
         } catch (e) {
+            progressReporter.dispose();
+            // If user cancelled, then do nothing.
+            if (progressReporter.token.isCancellationRequested && e instanceof CancellationError) {
+                return;
+            }
             if (e instanceof JupyterSelfCertsError) {
                 // On a self cert error, warn the user and ask if they want to change the setting
                 const enableOption: string = localize.DataScience.jupyterSelfCertEnable();
@@ -780,7 +776,7 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
                 throw e;
             }
         } finally {
-            status.dispose();
+            progressReporter.dispose();
         }
     }
 
@@ -829,7 +825,7 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
     private async showDataViewer(request: IShowDataViewer): Promise<void> {
         try {
             if (await this.checkColumnSize(request.columnSize)) {
-                await this.dataExplorerProvider.create(request.variableName, this._notebook!);
+                await this.dataExplorerProvider.create(request.variable, this._notebook!);
             }
         } catch (e) {
             this.applicationShell.showErrorMessage(e.toString());
@@ -1049,7 +1045,7 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
         }
     }
 
-    private async createNotebook(): Promise<void> {
+    private async createNotebook(token?: CancellationToken): Promise<void> {
         traceInfo('Getting jupyter server options ...');
 
         // Extract our options
@@ -1058,11 +1054,11 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
         traceInfo('Connecting to jupyter server ...');
 
         // Now try to create a notebook server
-        const server = await this.jupyterExecution.connectToNotebookServer(options);
+        const server = await this.jupyterExecution.connectToNotebookServer(options, token);
 
         // Then create a new notebook
         if (server) {
-            this._notebook = await server.createNotebook(await this.getNotebookIdentity());
+            this._notebook = await server.createNotebook(await this.getNotebookIdentity(), token);
         }
 
         if (this._notebook) {
@@ -1178,24 +1174,6 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
             if (options && !options.uri) {
                 activeInterpreter = await this.interpreterService.getActiveInterpreter();
                 const usableInterpreter = await this.jupyterExecution.getUsableJupyterPython();
-                if (usableInterpreter) {
-                    // See if the usable interpreter is not our active one. If so, show a warning
-                    // Only do this if not the guest in a liveshare session
-                    const api = await this.liveShare.getApi();
-                    if (!api || (api.session && api.session.role !== vsls.Role.Guest)) {
-                        const active = await this.interpreterService.getActiveInterpreter();
-                        const activeDisplayName = active ? active.displayName : undefined;
-                        const activePath = active ? active.path : undefined;
-                        const usableDisplayName = usableInterpreter ? usableInterpreter.displayName : undefined;
-                        const usablePath = usableInterpreter ? usableInterpreter.path : undefined;
-                        const notebookError = await this.jupyterExecution.getNotebookError();
-                        if (activePath && usablePath && !this.fileSystem.arePathsSame(activePath, usablePath) && activeDisplayName && usableDisplayName) {
-                            this.applicationShell.showWarningMessage(
-                                localize.DataScience.jupyterKernelNotSupportedOnActive().format(activeDisplayName, usableDisplayName, notebookError)
-                            );
-                        }
-                    }
-                }
                 return usableInterpreter ? true : false;
             } else {
                 return true;
@@ -1214,49 +1192,14 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
         }
     }
 
-    private async requestVariables(requestExecutionCount: number): Promise<void> {
-        this.variableRequestStopWatch = new StopWatch();
-
+    private async requestVariables(args: IJupyterVariablesRequest): Promise<void> {
         // Request our new list of variables
-        const vars: IJupyterVariable[] = this._notebook ? await this.jupyterVariables.getVariables(this._notebook) : [];
-        const variablesResponse: IJupyterVariablesResponse = { executionCount: requestExecutionCount, variables: vars };
+        const response: IJupyterVariablesResponse = this._notebook
+            ? await this.jupyterVariables.getVariables(this._notebook, args)
+            : { totalCount: 0, pageResponse: [], pageStartIndex: args.startIndex, executionCount: args.executionCount };
 
-        // Tag all of our jupyter variables with the execution count of the request
-        variablesResponse.variables.forEach((value: IJupyterVariable) => {
-            value.executionCount = requestExecutionCount;
-        });
-
-        const settings = this.configuration.getSettings();
-        const excludeString = settings.datascience.variableExplorerExclude;
-
-        if (excludeString) {
-            const excludeArray = excludeString.split(';');
-            variablesResponse.variables = variablesResponse.variables.filter(value => {
-                return excludeArray.indexOf(value.type) === -1;
-            });
-        }
-        this.variableRequestPendingCount = variablesResponse.variables.length;
-        this.postMessage(InteractiveWindowMessages.GetVariablesResponse, variablesResponse).ignoreErrors();
-        sendTelemetryEvent(Telemetry.VariableExplorerVariableCount, undefined, { variableCount: variablesResponse.variables.length });
-    }
-
-    // tslint:disable-next-line: no-any
-    private async requestVariableValue(payload?: any): Promise<void> {
-        if (payload && this._notebook) {
-            const targetVar = payload as IJupyterVariable;
-            // Request our variable value
-            const varValue: IJupyterVariable = await this.jupyterVariables.getValue(targetVar, this._notebook);
-            this.postMessage(InteractiveWindowMessages.GetVariableValueResponse, varValue).ignoreErrors();
-
-            // Send our fetch time if appropriate.
-            if (this.variableRequestPendingCount === 1 && this.variableRequestStopWatch) {
-                this.variableRequestPendingCount -= 1;
-                sendTelemetryEvent(Telemetry.VariableExplorerFetchTime, this.variableRequestStopWatch.elapsedTime);
-                this.variableRequestStopWatch = undefined;
-            } else {
-                this.variableRequestPendingCount = Math.max(0, this.variableRequestPendingCount - 1);
-            }
-        }
+        this.postMessage(InteractiveWindowMessages.GetVariablesResponse, response).ignoreErrors();
+        sendTelemetryEvent(Telemetry.VariableExplorerVariableCount, undefined, { variableCount: response.totalCount });
     }
 
     // tslint:disable-next-line: no-any

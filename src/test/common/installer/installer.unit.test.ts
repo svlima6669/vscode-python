@@ -464,7 +464,7 @@ suite('Module Installer only', () => {
                         });
                 }
                 // Test isInstalled()
-                if (product.value === Product.unittest || product.value === Product.jupyter || product.value === Product.notebook) {
+                if (product.value === Product.unittest) {
                     test(`Method isInstalled() returns true for module installer ${product.name} (${resource ? 'With a resource' : 'without a resource'})`, async () => {
                         const result = await installer.isInstalled(product.value, resource);
                         expect(result).to.equal(true, 'Should be true');
@@ -476,7 +476,7 @@ suite('Module Installer only', () => {
                         const pythonExecutionFactory = TypeMoq.Mock.ofType<IPythonExecutionFactory>();
                         const pythonExecutionService = TypeMoq.Mock.ofType<IPythonExecutionService>();
                         serviceContainer.setup(c => c.get(TypeMoq.It.isValue(IPythonExecutionFactory))).returns(() => pythonExecutionFactory.object);
-                        pythonExecutionFactory.setup(p => p.create(TypeMoq.It.isAny())).returns(() => Promise.resolve(pythonExecutionService.object));
+                        pythonExecutionFactory.setup(p => p.createActivatedEnvironment(TypeMoq.It.isAny())).returns(() => Promise.resolve(pythonExecutionService.object));
                         pythonExecutionService
                             // tslint:disable-next-line: no-any
                             .setup(p => (p as any).then)
@@ -496,7 +496,7 @@ suite('Module Installer only', () => {
                         const pythonExecutionFactory = TypeMoq.Mock.ofType<IPythonExecutionFactory>();
                         const pythonExecutionService = TypeMoq.Mock.ofType<IPythonExecutionService>();
                         serviceContainer.setup(c => c.get(TypeMoq.It.isValue(IPythonExecutionFactory))).returns(() => pythonExecutionFactory.object);
-                        pythonExecutionFactory.setup(p => p.create(TypeMoq.It.isAny())).returns(() => Promise.resolve(pythonExecutionService.object));
+                        pythonExecutionFactory.setup(p => p.createActivatedEnvironment(TypeMoq.It.isAny())).returns(() => Promise.resolve(pythonExecutionService.object));
                         pythonExecutionService
                             // tslint:disable-next-line: no-any
                             .setup(p => (p as any).then)

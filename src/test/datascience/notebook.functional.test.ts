@@ -22,12 +22,13 @@ import { EXTENSION_ROOT_DIR } from '../../client/common/constants';
 import { traceError, traceInfo } from '../../client/common/logger';
 import { IFileSystem } from '../../client/common/platform/types';
 import { IProcessServiceFactory, IPythonExecutionFactory, Output } from '../../client/common/process/types';
+import { Product } from '../../client/common/types';
 import { createDeferred, waitForPromise } from '../../client/common/utils/async';
 import { noop } from '../../client/common/utils/misc';
 import { Architecture } from '../../client/common/utils/platform';
-import { concatMultilineStringInput } from '../../client/datascience/common';
 import { Identifiers } from '../../client/datascience/constants';
 import { ModuleExistsStatus } from '../../client/datascience/jupyter/interpreter/jupyterCommandFinder';
+import { getMessageForLibrariesNotInstalled } from '../../client/datascience/jupyter/interpreter/jupyterInterpreterDependencyService';
 import { JupyterExecutionFactory } from '../../client/datascience/jupyter/jupyterExecutionFactory';
 import { JupyterKernelPromiseFailedError } from '../../client/datascience/jupyter/kernels/jupyterKernelPromiseFailedError';
 import {
@@ -43,6 +44,7 @@ import {
     InterruptResult
 } from '../../client/datascience/types';
 import { IInterpreterService, IKnownSearchPathsForInterpreters, InterpreterType, PythonInterpreter } from '../../client/interpreter/contracts';
+import { concatMultilineStringInput } from '../../datascience-ui/common';
 import { generateTestState, ICellViewModel } from '../../datascience-ui/interactive-common/mainState';
 import { asyncDump } from '../common/asyncDump';
 import { sleep } from '../core';
@@ -554,12 +556,10 @@ suite('DataScience notebook tests', () => {
 
         // Make sure we added in our chdir
         if (notebook) {
-            // tslint:disable-next-line:no-string-literal
-            const nbcells = notebook['cells'];
+            const nbcells = notebook.cells;
             if (nbcells) {
-                // tslint:disable-next-line:no-string-literal
-                const firstCellText: string = (nbcells as any)[0]['source'] as string;
-                assert.ok(firstCellText.includes('os.chdir'));
+                const firstCellText: string = nbcells[0].source as string;
+                assert.ok(firstCellText.includes('os.chdir'), `${firstCellText} does not include 'os.chdir`);
             }
         }
 
@@ -1176,6 +1176,7 @@ plt.show()`,
         const factory = ioc.serviceManager.get<IPythonExecutionFactory>(IPythonExecutionFactory);
         const service = await factory.create({ pythonPath });
         const mockService = service as MockPythonService;
+        // Used by commands (can be removed when `src/client/datascience/jupyter/interpreter/jupyterCommand.ts` is deleted).
         mockService.addExecResult(['-m', 'jupyter', 'notebook', '--version'], () => {
             return Promise.resolve({
                 stdout: '9.9.9.9',
@@ -1183,12 +1184,18 @@ plt.show()`,
             });
         });
 
+        // Used by commands (can be removed when `src/client/datascience/jupyter/interpreter/jupyterCommand.ts` is deleted).
         mockService.addExecResult(['-m', 'notebook', '--version'], () => {
             return Promise.resolve({
                 stdout: '',
                 stderr: 'Not supported'
             });
         });
+        // For new approach.
+        when(ioc.mockJupyter?.productInstaller.isInstalled(Product.jupyter)).thenResolve(false as any);
+        when(ioc.mockJupyter?.productInstaller.isInstalled(Product.notebook)).thenResolve(false as any);
+        when(ioc.mockJupyter?.productInstaller.isInstalled(Product.jupyter, anything())).thenResolve(false as any);
+        when(ioc.mockJupyter?.productInstaller.isInstalled(Product.notebook, anything())).thenResolve(false as any);
     }
 
     test('Notebook launch failure', async function() {
@@ -1214,7 +1221,11 @@ plt.show()`,
                 await jupyterExecution.connectToNotebookServer({ usingDarkTheme: false, useDefaultConfig: true, workingDir: testDir, purpose: '1' });
             } catch (e) {
                 threw = true;
-                assert.ok(e.message.includes('Not supported'), `Wrong error thrown when notebook is created. Error is ${e.message}`);
+                // When using old command finder, the error is `Not Supported` (directly from stdout). - can be deprecated when jupyterCommandFinder.ts is deleted.
+                // When using new approach, we inform user that some packages are not installed.
+                const expectedErrorMsg = getMessageForLibrariesNotInstalled([Product.jupyter, Product.notebook]);
+
+                assert.ok(e.message.includes('Not supported') || e.message.includes(expectedErrorMsg), `Wrong error thrown when notebook is created. Error is ${e.message}`);
             }
 
             assert.ok(threw, 'No exception thrown during notebook creation');
