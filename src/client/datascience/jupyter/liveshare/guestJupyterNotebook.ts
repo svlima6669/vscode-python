@@ -16,7 +16,7 @@ import * as localize from '../../../common/utils/localize';
 import { noop } from '../../../common/utils/misc';
 import { PythonInterpreter } from '../../../interpreter/contracts';
 import { LiveShare, LiveShareCommands } from '../../constants';
-import { ICell, IGatherExecution, IJupyterKernelSpec, INotebook, INotebookCompletion, INotebookServer, InterruptResult } from '../../types';
+import { ICell, ICellHashProvider, IGatherExecution, IJupyterKernelSpec, INotebook, INotebookCompletion, INotebookServer, InterruptResult } from '../../types';
 import { LiveKernelModel } from '../kernels/types';
 import { LiveShareParticipantDefault, LiveShareParticipantGuest } from './liveShareParticipantMixin';
 import { ResponseQueue } from './responseQueue';
@@ -203,6 +203,10 @@ export class GuestJupyterNotebook extends LiveShareParticipantGuest(LiveSharePar
     }
 
     public getGatherService(): IGatherExecution | undefined {
+        return;
+    }
+
+    public getCellHashProvider(): ICellHashProvider | undefined {
         return;
     }
 

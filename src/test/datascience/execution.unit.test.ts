@@ -50,6 +50,7 @@ import { NotebookStarter } from '../../client/datascience/jupyter/notebookStarte
 import { LiveShareApi } from '../../client/datascience/liveshare/liveshare';
 import {
     ICell,
+    ICellHashProvider,
     IConnection,
     IGatherExecution,
     IJupyterKernelSpec,
@@ -152,6 +153,10 @@ class MockJupyterNotebook implements INotebook {
     }
 
     public getGatherService(): IGatherExecution | undefined {
+        return;
+    }
+
+    public getCellHashProvider(): ICellHashProvider | undefined {
         return;
     }
 

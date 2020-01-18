@@ -1838,7 +1838,7 @@
                                 "query": "whos",
                                 "parseExpr": "'(\\w+)'"
                             }
-                        ]                        
+                        ]
                     ]
                 },
                 "python.disableInstallationCheck": {

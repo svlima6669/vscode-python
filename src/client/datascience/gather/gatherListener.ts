@@ -37,8 +37,7 @@ export class GatherListener implements IInteractiveWindowListener {
         @inject(IInteractiveWindowProvider) private interactiveWindowProvider: IInteractiveWindowProvider,
         @inject(IDocumentManager) private documentManager: IDocumentManager,
         @inject(IFileSystem) private fileSystem: IFileSystem
-    ) {
-    }
+    ) { }
 
     public dispose() {
         noop();
@@ -106,7 +105,7 @@ export class GatherListener implements IInteractiveWindowListener {
     }
 
     private gatherCodeInternal = async (cell: ICell) => {
-        const slicedProgram = (this.gatherService) ? this.gatherService.gatherCode(cell) : '';
+        const slicedProgram = this.gatherService ? this.gatherService.gatherCode(cell) : '';
 
         if (this.configService.getSettings().datascience.gatherToScript) {
             await this.showFile(slicedProgram, cell.file);

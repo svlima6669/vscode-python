@@ -5,16 +5,11 @@ import { IConfigurationService } from '../../common/types';
 import { noop } from '../../common/utils/misc';
 import { CellMatcher } from '../cellMatcher';
 import { concatMultilineStringInput } from '../common';
-import { ICell as IVscCell, IGatherExecution, IGatherLogger, INotebookExecutionLogger } from '../types';
+import { ICell as IVscCell, IGatherExecution, IGatherLogger } from '../types';
 
 @injectable()
-export class GatherLogger implements INotebookExecutionLogger, IGatherLogger {
-
-    constructor(
-        @inject(IGatherExecution) private gather: IGatherExecution,
-        @inject(IConfigurationService) private configService: IConfigurationService
-    ) {
-    }
+export class GatherLogger implements IGatherLogger {
+    constructor(@inject(IGatherExecution) private gather: IGatherExecution, @inject(IConfigurationService) private configService: IConfigurationService) { }
 
     public async preExecute(_vscCell: IVscCell, _silent: boolean): Promise<void> {
         // This function is just implemented here for compliance with the INotebookExecutionLogger interface

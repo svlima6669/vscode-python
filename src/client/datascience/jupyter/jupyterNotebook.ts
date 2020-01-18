@@ -29,6 +29,8 @@ import { CodeSnippits, Identifiers, Telemetry } from '../constants';
 import {
     CellState,
     ICell,
+    ICellHashLogger,
+    ICellHashProvider,
     IGatherExecution,
     IGatherLogger,
     IJupyterKernelSpec,
@@ -568,8 +570,17 @@ export class JupyterNotebookBase implements INotebook {
     }
 
     public getGatherService(): IGatherExecution | undefined {
-        const gatherLogger: INotebookExecutionLogger | undefined = this._loggers.find((logger: INotebookExecutionLogger) => { return (<IGatherLogger>logger).service !== undefined; });
+        const gatherLogger: INotebookExecutionLogger | undefined = this._loggers.find((logger: INotebookExecutionLogger) => {
+            return (<IGatherLogger>logger).service !== undefined;
+        });
         return gatherLogger ? (<IGatherLogger>gatherLogger).service() : undefined;
+    }
+
+    public getCellHashProvider(): ICellHashProvider | undefined {
+        const cellHashLogger: INotebookExecutionLogger | undefined = this._loggers.find((logger: INotebookExecutionLogger) => {
+            return (<ICellHashLogger>logger).getProvider !== undefined;
+        });
+        return cellHashLogger ? (<ICellHashLogger>cellHashLogger).getProvider() : undefined;
     }
 
     private async initializeMatplotlib(cancelToken?: CancellationToken): Promise<void> {
@@ -675,15 +686,15 @@ export class JupyterNotebookBase implements INotebook {
             const cellMatcher = new CellMatcher(this.configService.getSettings().datascience);
             return this.session
                 ? this.session.requestExecute(
-                      {
-                          // Remove the cell marker if we have one.
-                          code: cellMatcher.stripFirstMarker(code),
-                          stop_on_error: false,
-                          allow_stdin: true, // Allow when silent too in case runStartupCommands asks for a password
-                          store_history: !silent // Silent actually means don't output anything. Store_history is what affects execution_count
-                      },
-                      true
-                  )
+                    {
+                        // Remove the cell marker if we have one.
+                        code: cellMatcher.stripFirstMarker(code),
+                        stop_on_error: false,
+                        allow_stdin: true, // Allow when silent too in case runStartupCommands asks for a password
+                        store_history: !silent // Silent actually means don't output anything. Store_history is what affects execution_count
+                    },
+                    true
+                )
                 : undefined;
         } catch (exc) {
             // Any errors generating a request should just be logged. User can't do anything about it.

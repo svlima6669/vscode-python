@@ -12,6 +12,7 @@ import { DataViewer } from './data-viewing/dataViewer';
 import { DataViewerProvider } from './data-viewing/dataViewerProvider';
 import { DataScience } from './datascience';
 import { DebugLocationTrackerFactory } from './debugLocationTrackerFactory';
+import { CellHashLogger } from './editor-integration/cellhashLogger';
 import { CellHashProvider } from './editor-integration/cellhashprovider';
 import { CodeLensFactory } from './editor-integration/codeLensFactory';
 import { DataScienceCodeLensProvider } from './editor-integration/codelensprovider';
@@ -20,6 +21,7 @@ import { Decorator } from './editor-integration/decorator';
 import { DataScienceErrorHandler } from './errorHandler/errorHandler';
 import { GatherExecution } from './gather/gather';
 import { GatherListener } from './gather/gatherListener';
+import { GatherLogger } from './gather/gatherLogger';
 import { DebugListener } from './interactive-common/debugListener';
 import { IntellisenseProvider } from './interactive-common/intellisense/intellisenseProvider';
 import { LinkProvider } from './interactive-common/linkProvider';
@@ -58,6 +60,7 @@ import { StatusProvider } from './statusProvider';
 import { ThemeFinder } from './themeFinder';
 import {
     ICellHashListener,
+    ICellHashLogger,
     ICellHashProvider,
     ICodeCssGenerator,
     ICodeLensFactory,
@@ -91,7 +94,6 @@ import {
     IStatusProvider,
     IThemeFinder
 } from './types';
-import { GatherLogger } from './gather/gatherLogger';
 
 export function registerTypes(serviceManager: IServiceManager) {
     serviceManager.addSingleton<IDataScienceCodeLensProvider>(IDataScienceCodeLensProvider, DataScienceCodeLensProvider);
@@ -125,12 +127,16 @@ export function registerTypes(serviceManager: IServiceManager) {
     serviceManager.addSingleton<IJupyterDebugger>(IJupyterDebugger, JupyterDebugger);
     serviceManager.add<IDataScienceErrorHandler>(IDataScienceErrorHandler, DataScienceErrorHandler);
     serviceManager.addSingleton<ICodeLensFactory>(ICodeLensFactory, CodeLensFactory);
+
     serviceManager.add<ICellHashProvider>(ICellHashProvider, CellHashProvider);
-    serviceManager.add<IGatherLogger>(IGatherLogger, GatherLogger);
-    serviceManager.add<IGatherExecution>(IGatherExecution, GatherExecution);
+    serviceManager.add<ICellHashLogger>(ICellHashLogger, CellHashLogger);
+    serviceManager.addBinding(ICellHashLogger, INotebookExecutionLogger);
     serviceManager.addBinding(ICellHashProvider, IInteractiveWindowListener);
-    serviceManager.addBinding(ICellHashProvider, INotebookExecutionLogger);
+
+    serviceManager.add<IGatherExecution>(IGatherExecution, GatherExecution);
+    serviceManager.add<IGatherLogger>(IGatherLogger, GatherLogger);
     serviceManager.addBinding(IGatherLogger, INotebookExecutionLogger);
+
     serviceManager.addBinding(IJupyterDebugger, ICellHashListener);
     serviceManager.addSingleton<INotebookEditorProvider>(INotebookEditorProvider, NativeEditorProvider);
     serviceManager.add<INotebookEditor>(INotebookEditor, NativeEditor);

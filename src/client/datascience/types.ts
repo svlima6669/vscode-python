@@ -104,6 +104,7 @@ export interface INotebook extends IAsyncDisposable {
     setKernelSpec(spec: IJupyterKernelSpec | LiveKernelModel, timeoutMS: number): Promise<void>;
     setInterpreter(interpeter: PythonInterpreter): void;
     getGatherService(): IGatherExecution | undefined;
+    getCellHashProvider(): ICellHashProvider | undefined;
 }
 
 export interface INotebookServerOptions {
@@ -587,6 +588,11 @@ export const ICellHashProvider = Symbol('ICellHashProvider');
 export interface ICellHashProvider {
     updated: Event<void>;
     getHashes(): IFileHashes[];
+}
+
+export const ICellHashLogger = Symbol('ICellHashLogger');
+export interface ICellHashLogger extends INotebookExecutionLogger {
+    getProvider(): ICellHashProvider;
 }
 
 export interface IDebugLocation {
