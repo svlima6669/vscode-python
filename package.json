@@ -2788,7 +2788,7 @@
         "@jupyterlab/coreutils": "^3.1.0",
         "@jupyterlab/services": "^4.2.0",
         "@koa/cors": "^3.0.0",
-        "@msrvida/python-program-analysis": "^0.4.12",
+        "@msrvida/python-program-analysis": "^0.4.20",
         "ansi-regex": "^4.1.0",
         "arch": "^2.1.0",
         "azure-storage": "^2.10.3",
