@@ -13,17 +13,9 @@ import { traceInfo } from '../../../common/logger';
 import { IFileSystem } from '../../../common/platform/types';
 import { IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry } from '../../../common/types';
 import * as localize from '../../../common/utils/localize';
+import { IServiceContainer } from '../../../ioc/types';
 import { Identifiers, LiveShare, LiveShareCommands, RegExpValues } from '../../constants';
-import {
-    IDataScience,
-    IJupyterSession,
-    IJupyterSessionManager,
-    IJupyterSessionManagerFactory,
-    INotebook,
-    INotebookExecutionLogger,
-    INotebookServer,
-    INotebookServerLaunchInfo
-} from '../../types';
+import { IDataScience, IJupyterSession, IJupyterSessionManager, IJupyterSessionManagerFactory, INotebook, INotebookServer, INotebookServerLaunchInfo } from '../../types';
 import { JupyterServerBase } from '../jupyterServer';
 import { HostJupyterNotebook } from './hostJupyterNotebook';
 import { LiveShareParticipantHost } from './liveShareParticipantMixin';
@@ -44,11 +36,11 @@ export class HostJupyterServer extends LiveShareParticipantHost(JupyterServerBas
         configService: IConfigurationService,
         sessionManager: IJupyterSessionManagerFactory,
         private workspaceService: IWorkspaceService,
-        loggers: INotebookExecutionLogger[],
+        serviceContainer: IServiceContainer,
         private appService: IApplicationShell,
         private fs: IFileSystem
     ) {
-        super(liveShare, asyncRegistry, disposableRegistry, configService, sessionManager, loggers);
+        super(liveShare, asyncRegistry, disposableRegistry, configService, sessionManager, serviceContainer);
     }
 
     public async dispose(): Promise<void> {
@@ -136,7 +128,7 @@ export class HostJupyterServer extends LiveShareParticipantHost(JupyterServerBas
         possibleSession: IJupyterSession | undefined,
         disposableRegistry: IDisposableRegistry,
         configService: IConfigurationService,
-        loggers: INotebookExecutionLogger[],
+        serviceContainer: IServiceContainer,
         cancelToken?: CancellationToken
     ): Promise<INotebook> {
         // See if already exists.
@@ -172,7 +164,7 @@ export class HostJupyterServer extends LiveShareParticipantHost(JupyterServerBas
                 disposableRegistry,
                 this,
                 launchInfo,
-                loggers,
+                serviceContainer,
                 resource,
                 this.getDisposedError.bind(this),
                 this.workspaceService,

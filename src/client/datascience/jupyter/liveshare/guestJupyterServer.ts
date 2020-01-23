@@ -10,7 +10,7 @@ import { IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry } 
 import { createDeferred, Deferred } from '../../../common/utils/async';
 import * as localize from '../../../common/utils/localize';
 import { LiveShare, LiveShareCommands } from '../../constants';
-import { IConnection, IDataScience, IJupyterSessionManagerFactory, INotebook, INotebookExecutionLogger, INotebookServer, INotebookServerLaunchInfo } from '../../types';
+import { IConnection, IDataScience, IJupyterSessionManagerFactory, INotebook, INotebookServer, INotebookServerLaunchInfo } from '../../types';
 import { GuestJupyterNotebook } from './guestJupyterNotebook';
 import { LiveShareParticipantDefault, LiveShareParticipantGuest } from './liveShareParticipantMixin';
 import { ILiveShareParticipant } from './types';
@@ -29,8 +29,7 @@ export class GuestJupyterServer extends LiveShareParticipantGuest(LiveShareParti
         private disposableRegistry: IDisposableRegistry,
         private configService: IConfigurationService,
         _sessionManager: IJupyterSessionManagerFactory,
-        _workspaceService: IWorkspaceService,
-        _loggers: INotebookExecutionLogger[]
+        _workspaceService: IWorkspaceService
     ) {
         super(liveShare);
     }

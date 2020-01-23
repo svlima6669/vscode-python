@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 'use strict';
 import { inject, injectable } from 'inversify';
-import { CodeLens, Command, Event, EventEmitter, Range, TextDocument } from 'vscode';
+import { CodeLens, Command, Event, EventEmitter, Range, TextDocument, Uri } from 'vscode';
 
 import { traceWarning } from '../../common/logger';
 import { IFileSystem } from '../../common/platform/types';
@@ -11,8 +11,8 @@ import * as localize from '../../common/utils/localize';
 import { noop } from '../../common/utils/misc';
 import { generateCellRangesFromDocument } from '../cellFactory';
 import { CodeLensCommands, Commands } from '../constants';
-import { InteractiveWindowMessages } from '../interactive-common/interactiveWindowTypes';
-import { ICell, ICellHashProvider, ICodeLensFactory, IFileHashes, IInteractiveWindowListener } from '../types';
+import { IInteractiveWindowMapping, InteractiveWindowMessages } from '../interactive-common/interactiveWindowTypes';
+import { ICell, ICellHashProvider, ICodeLensFactory, IFileHashes, IInteractiveWindowListener, IInteractiveWindowProvider, IJupyterExecution, INotebook } from '../types';
 
 @injectable()
 export class CodeLensFactory implements ICodeLensFactory, IInteractiveWindowListener {
@@ -20,14 +20,14 @@ export class CodeLensFactory implements ICodeLensFactory, IInteractiveWindowList
     // tslint:disable-next-line: no-any
     private postEmitter: EventEmitter<{ message: string; payload: any }> = new EventEmitter<{ message: string; payload: any }>();
     private cellExecutionCounts: Map<string, string> = new Map<string, string>();
+    private hashProvider: ICellHashProvider | undefined;
 
     constructor(
         @inject(IConfigurationService) private configService: IConfigurationService,
-        @inject(ICellHashProvider) private hashProvider: ICellHashProvider,
+        @inject(IInteractiveWindowProvider) private interactiveWindowProvider: IInteractiveWindowProvider,
+        @inject(IJupyterExecution) private jupyterExecution: IJupyterExecution,
         @inject(IFileSystem) private fileSystem: IFileSystem
-    ) {
-        hashProvider.updated(this.hashesUpdated.bind(this));
-    }
+    ) { }
 
     public dispose(): void {
         noop();
@@ -41,6 +41,10 @@ export class CodeLensFactory implements ICodeLensFactory, IInteractiveWindowList
     // tslint:disable-next-line: no-any
     public onMessage(message: string, payload?: any) {
         switch (message) {
+            case InteractiveWindowMessages.NotebookExecutionActivated:
+                this.handleMessage(message, payload, this.doInitCellHashProvider);
+                break;
+
             case InteractiveWindowMessages.FinishCell:
                 const cell = payload as ICell;
                 if (cell && cell.data && cell.data.execution_count) {
@@ -65,7 +69,7 @@ export class CodeLensFactory implements ICodeLensFactory, IInteractiveWindowList
     public createCodeLenses(document: TextDocument): CodeLens[] {
         const ranges = generateCellRangesFromDocument(document, this.configService.getSettings().datascience);
         const commands = this.enumerateCommands();
-        const hashes = this.configService.getSettings().datascience.addGotoCodeLenses ? this.hashProvider.getHashes() : [];
+        const hashes = this.configService.getSettings().datascience.addGotoCodeLenses && this.hashProvider ? this.hashProvider.getHashes() : [];
         const codeLenses: CodeLens[] = [];
         let firstCell = true;
 
@@ -81,6 +85,40 @@ export class CodeLensFactory implements ICodeLensFactory, IInteractiveWindowList
         });
 
         return codeLenses;
+    }
+
+    // tslint:disable:no-any
+    private handleMessage<M extends IInteractiveWindowMapping, T extends keyof M>(_message: T, payload: any, handler: (args: M[T]) => void) {
+        const args = payload as M[T];
+        handler.bind(this)(args);
+    }
+
+    private doInitCellHashProvider(payload: string): void {
+        this.initCellHashProvider(payload).ignoreErrors();
+    }
+
+    private async initCellHashProvider(notebookUri: string) {
+        const nbUri: Uri = Uri.parse(notebookUri);
+        if (!nbUri) {
+            return;
+        }
+
+        // First get the active server
+        const activeServer = await this.jupyterExecution.getServer(await this.interactiveWindowProvider.getNotebookOptions());
+
+        let nb: INotebook | undefined;
+        // If that works, see if there's a matching notebook running
+        if (activeServer) {
+            nb = await activeServer.getNotebook(nbUri);
+
+            // If we have an executing notebook, get its gather execution service.
+            if (nb) {
+                this.hashProvider = nb.getCellHashProvider();
+                if (this.hashProvider) {
+                    this.hashProvider.updated(this.hashesUpdated.bind(this));
+                }
+            }
+        }
     }
 
     private enumerateCommands(): string[] {

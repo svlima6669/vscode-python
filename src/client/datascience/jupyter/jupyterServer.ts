@@ -11,16 +11,8 @@ import { IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry } 
 import { createDeferred, Deferred } from '../../common/utils/async';
 import * as localize from '../../common/utils/localize';
 import { noop } from '../../common/utils/misc';
-import {
-    IConnection,
-    IJupyterSession,
-    IJupyterSessionManager,
-    IJupyterSessionManagerFactory,
-    INotebook,
-    INotebookExecutionLogger,
-    INotebookServer,
-    INotebookServerLaunchInfo
-} from '../types';
+import { IServiceContainer } from '../../ioc/types';
+import { IConnection, IJupyterSession, IJupyterSessionManager, IJupyterSessionManagerFactory, INotebook, INotebookServer, INotebookServerLaunchInfo } from '../types';
 
 // This code is based on the examples here:
 // https://www.npmjs.com/package/@jupyterlab/services
@@ -41,7 +33,7 @@ export class JupyterServerBase implements INotebookServer {
         private disposableRegistry: IDisposableRegistry,
         private configService: IConfigurationService,
         private sessionManagerFactory: IJupyterSessionManagerFactory,
-        private loggers: INotebookExecutionLogger[]
+        private serviceContainer: IServiceContainer
     ) {
         this.asyncRegistry.push(this);
     }
@@ -86,7 +78,7 @@ export class JupyterServerBase implements INotebookServer {
         this.savedSession = undefined;
 
         // Create a notebook and return it.
-        return this.createNotebookInstance(resource, this.sessionManager, savedSession, this.disposableRegistry, this.configService, this.loggers, cancelToken);
+        return this.createNotebookInstance(resource, this.sessionManager, savedSession, this.disposableRegistry, this.configService, this.serviceContainer, cancelToken);
     }
 
     public async shutdown(): Promise<void> {
@@ -186,7 +178,7 @@ export class JupyterServerBase implements INotebookServer {
         _savedSession: IJupyterSession | undefined,
         _disposableRegistry: IDisposableRegistry,
         _configService: IConfigurationService,
-        _loggers: INotebookExecutionLogger[],
+        _serviceContainer: IServiceContainer,
         _cancelToken?: CancellationToken
     ): Promise<INotebook> {
         throw new Error('You forgot to override createNotebookInstance');

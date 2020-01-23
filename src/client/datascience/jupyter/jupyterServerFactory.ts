@@ -11,17 +11,18 @@ import '../../common/extensions';
 import { IFileSystem } from '../../common/platform/types';
 import { IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry } from '../../common/types';
 import { IInterpreterService } from '../../interpreter/contracts';
-import { IConnection, IDataScience, IJupyterSessionManagerFactory, INotebook, INotebookExecutionLogger, INotebookServer, INotebookServerLaunchInfo } from '../types';
+import { IServiceContainer } from '../../ioc/types';
+import { IConnection, IDataScience, IJupyterSessionManagerFactory, INotebook, INotebookServer, INotebookServerLaunchInfo } from '../types';
 import { GuestJupyterServer } from './liveshare/guestJupyterServer';
 import { HostJupyterServer } from './liveshare/hostJupyterServer';
 import { IRoleBasedObject, RoleBasedFactory } from './liveshare/roleBasedFactory';
 import { ILiveShareHasRole } from './liveshare/types';
 
-interface IJupyterServerInterface extends IRoleBasedObject, INotebookServer {}
+interface IJupyterServerInterface extends IRoleBasedObject, INotebookServer { }
 
 // tslint:disable:callable-types
 type JupyterServerClassType = {
-    new (
+    new(
         liveShare: ILiveShareApi,
         dataScience: IDataScience,
         asyncRegistry: IAsyncDisposableRegistry,
@@ -29,7 +30,7 @@ type JupyterServerClassType = {
         configService: IConfigurationService,
         sessionManager: IJupyterSessionManagerFactory,
         workspaceService: IWorkspaceService,
-        loggers: INotebookExecutionLogger[],
+        serviceContainer: IServiceContainer,
         appShell: IApplicationShell,
         fs: IFileSystem,
         interpreterService: IInterpreterService
@@ -52,7 +53,7 @@ export class JupyterServerFactory implements INotebookServer, ILiveShareHasRole 
         @inject(IConfigurationService) configService: IConfigurationService,
         @inject(IJupyterSessionManagerFactory) sessionManager: IJupyterSessionManagerFactory,
         @inject(IWorkspaceService) workspaceService: IWorkspaceService,
-        @multiInject(INotebookExecutionLogger) @optional() loggers: INotebookExecutionLogger[] | undefined,
+        @inject(IServiceContainer) serviceContainer: IServiceContainer,
         @inject(IApplicationShell) appShell: IApplicationShell,
         @inject(IFileSystem) fs: IFileSystem,
         @inject(IInterpreterService) interpreterService: IInterpreterService
@@ -68,7 +69,7 @@ export class JupyterServerFactory implements INotebookServer, ILiveShareHasRole 
             configService,
             sessionManager,
             workspaceService,
-            loggers ? loggers : [],
+            serviceContainer,
             appShell,
             fs,
             interpreterService

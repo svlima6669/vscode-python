@@ -14,6 +14,7 @@ import { DataViewer } from './data-viewing/dataViewer';
 import { DataViewerProvider } from './data-viewing/dataViewerProvider';
 import { DataScience } from './datascience';
 import { DebugLocationTrackerFactory } from './debugLocationTrackerFactory';
+import { CellHashLogger } from './editor-integration/cellhashLogger';
 import { CellHashProvider } from './editor-integration/cellhashprovider';
 import { CodeLensFactory } from './editor-integration/codeLensFactory';
 import { DataScienceCodeLensProvider } from './editor-integration/codelensprovider';
@@ -65,6 +66,7 @@ import { StatusProvider } from './statusProvider';
 import { ThemeFinder } from './themeFinder';
 import {
     ICellHashListener,
+    ICellHashLogger,
     ICellHashProvider,
     ICodeCssGenerator,
     ICodeLensFactory,
@@ -133,6 +135,8 @@ export function registerTypes(serviceManager: IServiceManager) {
     serviceManager.add<IDataScienceErrorHandler>(IDataScienceErrorHandler, DataScienceErrorHandler);
     serviceManager.addSingleton<ICodeLensFactory>(ICodeLensFactory, CodeLensFactory);
     serviceManager.addSingleton<ICellHashProvider>(ICellHashProvider, CellHashProvider);
+    serviceManager.add<ICellHashLogger>(ICellHashLogger, CellHashLogger);
+    serviceManager.addBinding(ICellHashLogger, INotebookExecutionLogger);
     serviceManager.add<IGatherExecution>(IGatherExecution, GatherExecution);
     serviceManager.addBinding(ICellHashProvider, IInteractiveWindowListener);
     serviceManager.addBinding(ICellHashProvider, INotebookExecutionLogger);

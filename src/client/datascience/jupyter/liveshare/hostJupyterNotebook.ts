@@ -11,9 +11,10 @@ import { traceError } from '../../../common/logger';
 import { IFileSystem } from '../../../common/platform/types';
 import { IConfigurationService, IDisposableRegistry } from '../../../common/types';
 import { createDeferred } from '../../../common/utils/async';
+import { IServiceContainer } from '../../../ioc/types';
 import { Identifiers, LiveShare, LiveShareCommands } from '../../constants';
 import { IExecuteInfo } from '../../interactive-common/interactiveWindowTypes';
-import { ICell, IJupyterSession, INotebook, INotebookExecutionLogger, INotebookServer, INotebookServerLaunchInfo, InterruptResult } from '../../types';
+import { ICell, IJupyterSession, INotebook, INotebookServer, INotebookServerLaunchInfo, InterruptResult } from '../../types';
 import { JupyterNotebookBase } from '../jupyterNotebook';
 import { LiveShareParticipantHost } from './liveShareParticipantMixin';
 import { ResponseQueue } from './responseQueue';
@@ -38,14 +39,14 @@ export class HostJupyterNotebook extends LiveShareParticipantHost(JupyterNoteboo
         disposableRegistry: IDisposableRegistry,
         owner: INotebookServer,
         launchInfo: INotebookServerLaunchInfo,
-        loggers: INotebookExecutionLogger[],
+        serviceContainer: IServiceContainer,
         resource: vscode.Uri,
         getDisposedError: () => Error,
         workspace: IWorkspaceService,
         appService: IApplicationShell,
         fs: IFileSystem
     ) {
-        super(liveShare, session, configService, disposableRegistry, owner, launchInfo, loggers, resource, getDisposedError, workspace, appService, fs);
+        super(liveShare, session, configService, disposableRegistry, owner, launchInfo, serviceContainer, resource, getDisposedError, workspace, appService, fs);
     }
 
     public dispose = async (): Promise<void> => {

@@ -105,11 +105,11 @@ export interface INotebook extends IAsyncDisposable {
     setLaunchingFile(file: string): Promise<void>;
     getSysInfo(): Promise<ICell | undefined>;
     setMatplotLibStyle(useDark: boolean): Promise<void>;
-    addLogger(logger: INotebookExecutionLogger): void;
     getMatchingInterpreter(): PythonInterpreter | undefined;
     getKernelSpec(): IJupyterKernelSpec | LiveKernelModel | undefined;
     setKernelSpec(spec: IJupyterKernelSpec | LiveKernelModel, timeoutMS: number): Promise<void>;
     setInterpreter(interpeter: PythonInterpreter): void;
+    getCellHashProvider(): ICellHashProvider | undefined;
 }
 
 export interface INotebookServerOptions {
@@ -604,6 +604,11 @@ export const ICellHashProvider = Symbol('ICellHashProvider');
 export interface ICellHashProvider {
     updated: Event<void>;
     getHashes(): IFileHashes[];
+}
+
+export const ICellHashLogger = Symbol('ICellHashLogger');
+export interface ICellHashLogger extends INotebookExecutionLogger {
+    getProvider(): ICellHashProvider;
 }
 
 export interface IDebugLocation {

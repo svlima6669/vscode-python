@@ -16,7 +16,7 @@ import * as localize from '../../../common/utils/localize';
 import { noop } from '../../../common/utils/misc';
 import { PythonInterpreter } from '../../../interpreter/contracts';
 import { LiveShare, LiveShareCommands } from '../../constants';
-import { ICell, IJupyterKernelSpec, INotebook, INotebookCompletion, INotebookExecutionLogger, INotebookServer, InterruptResult } from '../../types';
+import { ICell, ICellHashProvider, IJupyterKernelSpec, INotebook, INotebookCompletion, INotebookServer, InterruptResult } from '../../types';
 import { LiveKernelModel } from '../kernels/types';
 import { LiveShareParticipantDefault, LiveShareParticipantGuest } from './liveShareParticipantMixin';
 import { ResponseQueue } from './responseQueue';
@@ -112,10 +112,6 @@ export class GuestJupyterNotebook extends LiveShareParticipantGuest(LiveSharePar
         return Promise.resolve();
     }
 
-    public addLogger(_logger: INotebookExecutionLogger): void {
-        noop();
-    }
-
     public async setMatplotLibStyle(_useDark: boolean): Promise<void> {
         // Guest can't change the style. Maybe output a warning here?
     }
@@ -208,6 +204,10 @@ export class GuestJupyterNotebook extends LiveShareParticipantGuest(LiveSharePar
 
     public setKernelSpec(_spec: IJupyterKernelSpec | LiveKernelModel, _timeout: number): Promise<void> {
         return Promise.resolve();
+    }
+
+    public getCellHashProvider(): ICellHashProvider | undefined {
+        return;
     }
 
     private onServerResponse = (args: Object) => {

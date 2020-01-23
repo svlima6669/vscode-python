@@ -21,13 +21,11 @@ import {
     INotebookEditorProvider,
     INotebookExporter
 } from '../types';
-import { GatherLogger } from './gatherLogger';
 
 @injectable()
 export class GatherListener implements IInteractiveWindowListener {
     // tslint:disable-next-line: no-any
     private postEmitter: EventEmitter<{ message: string; payload: any }> = new EventEmitter<{ message: string; payload: any }>();
-    private gatherLogger: GatherLogger;
     private notebookUri: Uri | undefined;
 
     constructor(
@@ -40,9 +38,7 @@ export class GatherListener implements IInteractiveWindowListener {
         @inject(IConfigurationService) private configService: IConfigurationService,
         @inject(IDocumentManager) private documentManager: IDocumentManager,
         @inject(IFileSystem) private fileSystem: IFileSystem
-    ) {
-        this.gatherLogger = new GatherLogger(this.gather, this.configService);
-    }
+    ) { }
 
     public dispose() {
         noop();
@@ -96,7 +92,8 @@ export class GatherListener implements IInteractiveWindowListener {
 
             // If we have an executing notebook, add the gather logger.
             if (nb) {
-                nb.addLogger(this.gatherLogger);
+                noop();
+                //Eventually it should be this call: this.gatherProvider = nb.getgatherProvider();
             }
         }
     }
