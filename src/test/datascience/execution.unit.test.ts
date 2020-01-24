@@ -49,6 +49,7 @@ import { NotebookStarter } from '../../client/datascience/jupyter/notebookStarte
 import { LiveShareApi } from '../../client/datascience/liveshare/liveshare';
 import {
     ICell,
+    ICellHashProvider,
     IConnection,
     IJupyterKernelSpec,
     IJupyterSubCommandExecutionService,
@@ -153,6 +154,10 @@ class MockJupyterNotebook implements INotebook {
 
     public setKernelSpec(_spec: IJupyterKernelSpec | LiveKernelModel, _timeout: number): Promise<void> {
         return Promise.resolve();
+    }
+
+    public getCellHashProvider(): ICellHashProvider | undefined {
+        return;
     }
 
     public get onSessionStatusChanged(): Event<ServerStatus> {
