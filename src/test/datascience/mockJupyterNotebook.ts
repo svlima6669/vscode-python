@@ -6,7 +6,16 @@ import { Observable } from 'rxjs/Observable';
 import { CancellationToken, Event, EventEmitter, Uri } from 'vscode';
 import { Identifiers } from '../../client/datascience/constants';
 import { LiveKernelModel } from '../../client/datascience/jupyter/kernels/types';
-import { ICell, IJupyterKernelSpec, INotebook, INotebookCompletion, INotebookExecutionLogger, INotebookServer, InterruptResult } from '../../client/datascience/types';
+import {
+    ICell,
+    ICellHashProvider,
+    IJupyterKernelSpec,
+    INotebook,
+    INotebookCompletion,
+    INotebookExecutionLogger,
+    INotebookServer,
+    InterruptResult
+} from '../../client/datascience/types';
 import { PythonInterpreter } from '../../client/interpreter/contracts';
 import { ServerStatus } from '../../datascience-ui/interactive-common/mainState';
 import { noop } from '../core';
@@ -93,6 +102,10 @@ export class MockJupyterNotebook implements INotebook {
 
     public setKernelSpec(_spec: IJupyterKernelSpec | LiveKernelModel, _timeout: number): Promise<void> {
         return Promise.resolve();
+    }
+
+    public getCellHashProvider(): ICellHashProvider | undefined {
+        return;
     }
 
     public get onSessionStatusChanged(): Event<ServerStatus> {
