@@ -91,7 +91,7 @@ export class GatherListener implements IInteractiveWindowListener {
 
             // If we have an executing notebook, get its gather execution service.
             if (nb) {
-                this.gatherProvider = nb.getgatherProvider();
+                this.gatherProvider = nb.getGatherProvider();
             }
         }
     }

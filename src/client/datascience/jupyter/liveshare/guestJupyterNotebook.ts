@@ -206,7 +206,7 @@ export class GuestJupyterNotebook extends LiveShareParticipantGuest(LiveSharePar
         return;
     }
 
-    public getgatherProvider(): IGatherProvider | undefined {
+    public getGatherProvider(): IGatherProvider | undefined {
         return;
     }
 

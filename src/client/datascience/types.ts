@@ -110,7 +110,7 @@ export interface INotebook extends IAsyncDisposable {
     getKernelSpec(): IJupyterKernelSpec | LiveKernelModel | undefined;
     setKernelSpec(spec: IJupyterKernelSpec | LiveKernelModel, timeoutMS: number): Promise<void>;
     setInterpreter(interpeter: PythonInterpreter): void;
-    getgatherProvider(): IGatherProvider | undefined;
+    getGatherProvider(): IGatherProvider | undefined;
     getCellHashProvider(): ICellHashProvider | undefined;
 }
 

@@ -576,7 +576,7 @@ export class JupyterNotebookBase implements INotebook {
         this.kernelChanged.fire(spec);
     }
 
-    public getgatherProvider(): IGatherProvider | undefined {
+    public getGatherProvider(): IGatherProvider | undefined {
         const gatherLogger: INotebookExecutionLogger | undefined = this._loggers.find((logger: INotebookExecutionLogger) => {
             return (<IGatherLogger>logger).service !== undefined;
         });

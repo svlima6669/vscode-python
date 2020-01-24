@@ -45,7 +45,7 @@ export class MockJupyterNotebook implements INotebook {
     constructor(private owner: INotebookServer) {
         noop();
     }
-    public getgatherProvider(): IGatherProvider | undefined {
+    public getGatherProvider(): IGatherProvider | undefined {
         throw new Error('Method not implemented.');
     }
     public getCellHashProvider(): ICellHashProvider | undefined {
