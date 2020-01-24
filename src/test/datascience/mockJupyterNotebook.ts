@@ -6,24 +6,50 @@ import { Observable } from 'rxjs/Observable';
 import { CancellationToken, Event, EventEmitter, Uri } from 'vscode';
 import { Identifiers } from '../../client/datascience/constants';
 import { LiveKernelModel } from '../../client/datascience/jupyter/kernels/types';
-import { ICell, IJupyterKernelSpec, INotebook, INotebookCompletion, INotebookExecutionLogger, INotebookServer, InterruptResult } from '../../client/datascience/types';
+import {
+    ICell,
+    ICellHashProvider,
+    IGatherProvider,
+    IJupyterKernelSpec,
+    INotebook,
+    INotebookCompletion,
+    INotebookExecutionLogger,
+    INotebookServer,
+    InterruptResult
+} from '../../client/datascience/types';
 import { PythonInterpreter } from '../../client/interpreter/contracts';
 import { ServerStatus } from '../../datascience-ui/interactive-common/mainState';
 import { noop } from '../core';
 
 export class MockJupyterNotebook implements INotebook {
-    public onKernelChanged: Event<IJupyterKernelSpec | LiveKernelModel> = new EventEmitter<IJupyterKernelSpec | LiveKernelModel>().event;
-    private onStatusChangedEvent: EventEmitter<ServerStatus> | undefined;
-    constructor(private owner: INotebookServer) {
-        noop();
-    }
-
     public get server(): INotebookServer {
         return this.owner;
     }
 
     public get resource(): Uri {
         return Uri.parse(Identifiers.InteractiveWindowIdentity);
+    }
+
+    public get onSessionStatusChanged(): Event<ServerStatus> {
+        if (!this.onStatusChangedEvent) {
+            this.onStatusChangedEvent = new EventEmitter<ServerStatus>();
+        }
+        return this.onStatusChangedEvent.event;
+    }
+
+    public get status(): ServerStatus {
+        return ServerStatus.Idle;
+    }
+    public onKernelChanged: Event<IJupyterKernelSpec | LiveKernelModel> = new EventEmitter<IJupyterKernelSpec | LiveKernelModel>().event;
+    private onStatusChangedEvent: EventEmitter<ServerStatus> | undefined;
+    constructor(private owner: INotebookServer) {
+        noop();
+    }
+    public getgatherProvider(): IGatherProvider | undefined {
+        throw new Error('Method not implemented.');
+    }
+    public getCellHashProvider(): ICellHashProvider | undefined {
+        throw new Error('Method not implemented.');
     }
 
     public clear(_id: string): void {
@@ -93,16 +119,5 @@ export class MockJupyterNotebook implements INotebook {
 
     public setKernelSpec(_spec: IJupyterKernelSpec | LiveKernelModel, _timeout: number): Promise<void> {
         return Promise.resolve();
-    }
-
-    public get onSessionStatusChanged(): Event<ServerStatus> {
-        if (!this.onStatusChangedEvent) {
-            this.onStatusChangedEvent = new EventEmitter<ServerStatus>();
-        }
-        return this.onStatusChangedEvent.event;
-    }
-
-    public get status(): ServerStatus {
-        return ServerStatus.Idle;
     }
 }
