@@ -107,7 +107,7 @@ export function sendTelemetryEvent<P extends IEventNamePropertyMapping, E extend
                 // If there are any errors in serializing one property, ignore that and move on.
                 // Else nothign will be sent.
                 // tslint:disable-next-line:prefer-type-cast no-any  no-unsafe-any
-                (customProperties as any)[prop] = typeof data[prop] === 'string' ? data[prop] : data[prop].toString();
+                (customProperties as any)[prop] = typeof data[prop] === 'string' ? data[prop] : typeof data[prop] === 'object' ? 'object' : data[prop].toString();
             } catch (ex) {
                 traceError(`Failed to serialize ${prop} for ${eventName}`, ex);
             }
@@ -1421,7 +1421,6 @@ export interface IEventNamePropertyMapping {
     [Telemetry.CodeLensAverageAcquisitionTime]: never | undefined;
     [Telemetry.CollapseAll]: never | undefined;
     [Telemetry.ConnectFailedJupyter]: never | undefined;
-    [Telemetry.NotebookExecutionActivated]: never | undefined;
     [Telemetry.ConnectLocalJupyter]: never | undefined;
     [Telemetry.ConnectRemoteJupyter]: never | undefined;
     [Telemetry.ConnectRemoteFailedJupyter]: never | undefined;
@@ -1435,7 +1434,6 @@ export interface IEventNamePropertyMapping {
     [Telemetry.CopySourceCode]: never | undefined;
     [Telemetry.CreateNewNotebook]: never | undefined;
     [Telemetry.DataScienceSettings]: JSONObject;
-    [Telemetry.DataViewerFetchTime]: never | undefined;
     [Telemetry.DebugContinue]: never | undefined;
     [Telemetry.DebugCurrentCell]: never | undefined;
     [Telemetry.DebugStepOver]: never | undefined;
@@ -1469,6 +1467,7 @@ export interface IEventNamePropertyMapping {
     [Telemetry.NotebookOpenTime]: number;
     [Telemetry.PandasNotInstalled]: never | undefined;
     [Telemetry.PandasTooOld]: never | undefined;
+    [Telemetry.PtvsdInstallCancelled]: never | undefined;
     [Telemetry.PtvsdInstallFailed]: never | undefined;
     [Telemetry.PtvsdPromptToInstall]: never | undefined;
     [Telemetry.PtvsdSuccessfullyInstalled]: never | undefined;

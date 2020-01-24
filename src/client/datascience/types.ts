@@ -92,6 +92,7 @@ export interface INotebookServer extends IAsyncDisposable {
 export interface INotebook extends IAsyncDisposable {
     readonly resource: Uri;
     readonly server: INotebookServer;
+    readonly status: ServerStatus;
     onSessionStatusChanged: Event<ServerStatus>;
     onKernelChanged: Event<IJupyterKernelSpec | LiveKernelModel>;
     clear(id: string): void;
@@ -121,6 +122,7 @@ export interface INotebookServerOptions {
     workingDir?: string;
     purpose: string;
     metadata?: nbformat.INotebookMetadata;
+    disableUI?: boolean;
 }
 
 export const INotebookExecutionLogger = Symbol('INotebookExecutionLogger');
@@ -145,6 +147,7 @@ export interface IGatherLogger extends INotebookExecutionLogger {
 export const IJupyterExecution = Symbol('IJupyterExecution');
 export interface IJupyterExecution extends IAsyncDisposable {
     sessionChanged: Event<void>;
+    serverStarted: Event<INotebookServerOptions>;
     isNotebookSupported(cancelToken?: CancellationToken): Promise<boolean>;
     isImportSupported(cancelToken?: CancellationToken): Promise<boolean>;
     isSpawnSupported(cancelToken?: CancellationToken): Promise<boolean>;
@@ -178,6 +181,7 @@ export interface IJupyterPasswordConnect {
 
 export const IJupyterSession = Symbol('IJupyterSession');
 export interface IJupyterSession extends IAsyncDisposable {
+    readonly status: ServerStatus;
     onSessionStatusChanged: Event<ServerStatus>;
     restart(timeout: number): Promise<void>;
     interrupt(timeout: number): Promise<void>;
