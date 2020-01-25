@@ -143,7 +143,7 @@ import { CodeLensFactory } from '../../client/datascience/editor-integration/cod
 import { DataScienceCodeLensProvider } from '../../client/datascience/editor-integration/codelensprovider';
 import { CodeWatcher } from '../../client/datascience/editor-integration/codewatcher';
 import { DataScienceErrorHandler } from '../../client/datascience/errorHandler/errorHandler';
-import { GatherExecution } from '../../client/datascience/gather/gather';
+import { GatherProvider } from '../../client/datascience/gather/gather';
 import { GatherListener } from '../../client/datascience/gather/gatherListener';
 import { IntellisenseProvider } from '../../client/datascience/interactive-common/intellisense/intellisenseProvider';
 import { AutoSaveService } from '../../client/datascience/interactive-ipynb/autoSaveService';
@@ -477,7 +477,7 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
         this.serviceManager.add<IInteractiveWindowListener>(IInteractiveWindowListener, GatherListener);
         this.serviceManager.addBinding(ICellHashProvider, INotebookExecutionLogger);
         this.serviceManager.addBinding(IJupyterDebugger, ICellHashListener);
-        this.serviceManager.add<IGatherProvider>(IGatherProvider, GatherExecution);
+        this.serviceManager.add<IGatherProvider>(IGatherProvider, GatherProvider);
         this.serviceManager.addSingleton<ICodeLensFactory>(ICodeLensFactory, CodeLensFactory);
         this.serviceManager.addSingleton<IShellDetector>(IShellDetector, TerminalNameShellDetector);
         this.serviceManager.addSingleton<InterpeterHashProviderFactory>(InterpeterHashProviderFactory, InterpeterHashProviderFactory);
@@ -928,7 +928,7 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
                     this.postMessageToWebPanel(msg);
                 },
                 // tslint:disable-next-line:no-any no-empty
-                setState: (_msg: any) => {},
+                setState: (_msg: any) => { },
                 // tslint:disable-next-line:no-any no-empty
                 getState: () => {
                     return {};

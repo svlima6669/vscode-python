@@ -21,7 +21,6 @@ import { DataScienceCodeLensProvider } from './editor-integration/codelensprovid
 import { CodeWatcher } from './editor-integration/codewatcher';
 import { Decorator } from './editor-integration/decorator';
 import { DataScienceErrorHandler } from './errorHandler/errorHandler';
-import { GatherExecution } from './gather/gather';
 import { GatherListener } from './gather/gatherListener';
 import { GatherLogger } from './gather/gatherLogger';
 import { DebugListener } from './interactive-common/debugListener';
@@ -143,10 +142,6 @@ export function registerTypes(serviceManager: IServiceManager) {
     serviceManager.addBinding(ICellHashLogger, INotebookExecutionLogger);
     serviceManager.addBinding(ICellHashProvider, IInteractiveWindowListener);
 
-    serviceManager.add<IGatherProvider>(IGatherProvider, GatherExecution);
-    serviceManager.add<IGatherLogger>(IGatherLogger, GatherLogger);
-    serviceManager.addBinding(IGatherLogger, INotebookExecutionLogger);
-
     serviceManager.addBinding(IJupyterDebugger, ICellHashListener);
     serviceManager.addSingleton<INotebookEditorProvider>(INotebookEditorProvider, NativeEditorProvider);
     serviceManager.add<INotebookEditor>(INotebookEditor, NativeEditor);
@@ -182,5 +177,15 @@ export function registerTypes(serviceManager: IServiceManager) {
     } else {
         serviceManager.addSingleton<IJupyterSubCommandExecutionService>(IJupyterSubCommandExecutionService, JupyterInterpreterSubCommandExecutionService);
         serviceManager.addSingleton<IJupyterInterpreterDependencyManager>(IJupyterInterpreterDependencyManager, JupyterInterpreterSubCommandExecutionService);
+    }
+
+    const gatherEnabled: boolean = false; //serviceManager.get<IConfigurationService>('python.dataScience', undefined).getSettings().datascience.enableGather ? true : false;
+    if (gatherEnabled) {
+        // tslint:disable-next-line: no-require-imports
+        const gather = require('./gather/gather');
+
+        serviceManager.add<IGatherProvider>(IGatherProvider, gather.GatherProvider);
+        serviceManager.add<IGatherLogger>(IGatherLogger, GatherLogger);
+        serviceManager.addBinding(IGatherLogger, INotebookExecutionLogger);
     }
 }

@@ -1,7 +1,6 @@
-import { Cell as IGatherCell, CellSlice, DataflowAnalyzer, ExecutionLogSlicer } from '@msrvida/python-program-analysis';
-
 import { inject, injectable } from 'inversify';
 import * as uuid from 'uuid/v4';
+import { Cell, CellSlice, DataflowAnalyzer, ExecutionLogSlicer } from '../../../../types/@msrvida-python-program-analysis';
 import { IApplicationShell, ICommandManager } from '../../common/application/types';
 import { traceInfo } from '../../common/logger';
 import { IConfigurationService, IDisposableRegistry } from '../../common/types';
@@ -11,12 +10,15 @@ import { Common } from '../../common/utils/localize';
 import { Identifiers } from '../constants';
 import { CellState, ICell as IVscCell, IGatherProvider } from '../types';
 
+// tslint:disable-next-line: no-var-requires no-require-imports
+const programAnalysis: typeof import('@msrvida-python-program-analysis') = require('@msrvida-python-program-analysis');
+
 /**
  * An adapter class to wrap the code gathering functionality from [microsoft/python-program-analysis](https://www.npmjs.com/package/@msrvida/python-program-analysis).
  */
 @injectable()
-export class GatherExecution implements IGatherProvider {
-    private _executionSlicer: ExecutionLogSlicer<IGatherCell>;
+export class GatherProvider implements IGatherProvider {
+    private _executionSlicer: ExecutionLogSlicer<Cell>;
     private dataflowAnalyzer: DataflowAnalyzer;
     private _enabled: boolean;
 
@@ -28,8 +30,8 @@ export class GatherExecution implements IGatherProvider {
     ) {
         this._enabled = this.configService.getSettings().datascience.enableGather ? true : false;
 
-        this.dataflowAnalyzer = new DataflowAnalyzer();
-        this._executionSlicer = new ExecutionLogSlicer(this.dataflowAnalyzer);
+        this.dataflowAnalyzer = new programAnalysis.DataflowAnalyzer();
+        this._executionSlicer = new programAnalysis.ExecutionLogSlicer(this.dataflowAnalyzer);
 
         if (this._enabled) {
             this.disposables.push(this.configService.getSettings().onDidChange(e => this.updateEnableGather(e)));
@@ -108,10 +110,10 @@ function concat(existingText: string, newText: CellSlice): string {
  * This is called to convert VS Code ICells to Gather ICells for logging.
  * @param cell A cell object conforming to the VS Code cell interface
  */
-function convertVscToGatherCell(cell: IVscCell): IGatherCell | undefined {
+function convertVscToGatherCell(cell: IVscCell): Cell | undefined {
     // This should always be true since we only want to log code cells. Putting this here so types match for outputs property
     if (cell.data.cell_type === 'code') {
-        const result: IGatherCell = {
+        const result: Cell = {
             // tslint:disable-next-line no-unnecessary-local-variable
             text: cell.data.source,
 
