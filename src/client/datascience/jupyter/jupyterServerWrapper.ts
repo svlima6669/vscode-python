@@ -37,6 +37,7 @@ type JupyterServerClassType = {
 };
 // tslint:enable:callable-types
 
+// This class wraps either a HostJupyterServer or a GuestJupyterServer based on the liveshare state
 @injectable()
 export class JupyterServerWrapper implements INotebookServer, ILiveShareHasRole {
     private serverFactory: RoleBasedFactory<IJupyterServerInterface, JupyterServerClassType>;
