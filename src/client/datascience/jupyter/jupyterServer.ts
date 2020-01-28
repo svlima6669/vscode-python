@@ -11,16 +11,8 @@ import { IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry } 
 import { createDeferred, Deferred } from '../../common/utils/async';
 import * as localize from '../../common/utils/localize';
 import { noop } from '../../common/utils/misc';
-import {
-    IConnection,
-    IJupyterSession,
-    IJupyterSessionManager,
-    IJupyterSessionManagerFactory,
-    INotebook,
-    INotebookServer,
-    INotebookServerLaunchInfo
-} from '../types';
 import { IServiceContainer } from '../../ioc/types';
+import { IConnection, IJupyterSession, IJupyterSessionManager, IJupyterSessionManagerFactory, INotebook, INotebookServer, INotebookServerLaunchInfo } from '../types';
 
 // This code is based on the examples here:
 // https://www.npmjs.com/package/@jupyterlab/services
@@ -187,7 +179,8 @@ export class JupyterServerBase implements INotebookServer {
         _disposableRegistry: IDisposableRegistry,
         _configService: IConfigurationService,
         _serviceContainer: IServiceContainer,
-        _cancelToken?: CancellationToken): Promise<INotebook> {
+        _cancelToken?: CancellationToken
+    ): Promise<INotebook> {
         throw new Error('You forgot to override createNotebookInstance');
     }
 

@@ -141,7 +141,6 @@ export function registerTypes(serviceManager: IServiceManager) {
     serviceManager.add<ICellHashProvider>(ICellHashProvider, CellHashProvider);
     serviceManager.add<ICellHashLogger>(ICellHashLogger, CellHashLogger);
     serviceManager.addBinding(ICellHashLogger, INotebookExecutionLogger);
-    serviceManager.addBinding(ICellHashProvider, IInteractiveWindowListener);
 
     serviceManager.addBinding(IJupyterDebugger, ICellHashListener);
     serviceManager.addSingleton<INotebookEditorProvider>(INotebookEditorProvider, NativeEditorProvider);

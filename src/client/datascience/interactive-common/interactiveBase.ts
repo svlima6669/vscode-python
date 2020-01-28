@@ -952,8 +952,7 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
         if (!this._notebook) {
             this._notebook = await server.createNotebook(await this.getNotebookIdentity());
             if (this._notebook) {
-                const uri: Uri = await this.getNotebookIdentity();
-                this.postMessage(InteractiveWindowMessages.NotebookExecutionActivated, uri.toString()).ignoreErrors();
+                this.postMessage(InteractiveWindowMessages.NotebookExecutionActivated, this._notebook).ignoreErrors();
 
                 const statusChangeHandler = async (status: ServerStatus) => {
                     if (this._notebook) {

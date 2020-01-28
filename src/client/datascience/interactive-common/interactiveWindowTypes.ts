@@ -5,7 +5,7 @@ import * as monacoEditor from 'monaco-editor/esm/vs/editor/editor.api';
 import { IServerState } from '../../../datascience-ui/interactive-common/mainState';
 import { CssMessages, IGetCssRequest, IGetCssResponse, IGetMonacoThemeRequest } from '../messages';
 import { IGetMonacoThemeResponse } from '../monacoMessages';
-import { ICell, IInteractiveWindowInfo, IJupyterVariable, IJupyterVariablesRequest, IJupyterVariablesResponse } from '../types';
+import { ICell, IInteractiveWindowInfo, IJupyterVariable, IJupyterVariablesRequest, IJupyterVariablesResponse, INotebook } from '../types';
 
 export enum InteractiveWindowMessages {
     StartCell = 'start_cell',
@@ -299,7 +299,7 @@ export class IInteractiveWindowMapping {
     public [InteractiveWindowMessages.UpdateCell]: ICell;
     public [InteractiveWindowMessages.GotoCodeCell]: IGotoCode;
     public [InteractiveWindowMessages.CopyCodeCell]: ICopyCode;
-    public [InteractiveWindowMessages.NotebookExecutionActivated]: string;
+    public [InteractiveWindowMessages.NotebookExecutionActivated]: INotebook;
     public [InteractiveWindowMessages.RestartKernel]: never | undefined;
     public [InteractiveWindowMessages.SelectKernel]: IServerState | undefined;
     public [InteractiveWindowMessages.SelectJupyterServer]: never | undefined;

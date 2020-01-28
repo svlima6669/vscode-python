@@ -93,30 +93,17 @@ export class CodeLensFactory implements ICodeLensFactory, IInteractiveWindowList
         handler.bind(this)(args);
     }
 
-    private doInitCellHashProvider(payload: string): void {
+    private doInitCellHashProvider(payload: INotebook): void {
         this.initCellHashProvider(payload).ignoreErrors();
     }
 
-    private async initCellHashProvider(notebookUri: string) {
-        const nbUri: Uri = Uri.parse(notebookUri);
-        if (!nbUri) {
-            return;
-        }
-
-        // First get the active server
+    private async initCellHashProvider(notebook: INotebook) {
         const activeServer = await this.jupyterExecution.getServer(await this.interactiveWindowProvider.getNotebookOptions());
 
-        let nb: INotebook | undefined;
-        // If that works, see if there's a matching notebook running
-        if (activeServer) {
-            nb = await activeServer.getNotebook(nbUri);
-
-            // If we have an executing notebook, get its gather execution service.
-            if (nb) {
-                this.hashProvider = nb.getCellHashProvider();
-                if (this.hashProvider) {
-                    this.hashProvider.updated(this.hashesUpdated.bind(this));
-                }
+        if (activeServer && notebook) {
+            this.hashProvider = notebook.getCellHashProvider();
+            if (this.hashProvider) {
+                this.hashProvider.updated(this.hashesUpdated.bind(this));
             }
         }
     }
