@@ -78,15 +78,25 @@ export class GatherListener implements IInteractiveWindowListener {
         }
     }
 
-    private doInitGather(payload: INotebook): void {
+    private doInitGather(payload: string): void {
         this.initGather(payload).ignoreErrors();
     }
 
-    private async initGather(notebook: INotebook) {
+    private async initGather(notebookUri: string) {
+        this.notebookUri = Uri.parse(notebookUri);
+
+        // First get the active server
         const activeServer = await this.jupyterExecution.getServer(await this.interactiveWindowProvider.getNotebookOptions());
 
-        if (activeServer && notebook) {
-            this.gatherProvider = notebook.getGatherProvider();
+        let nb: INotebook | undefined;
+        // If that works, see if there's a matching notebook running
+        if (activeServer) {
+            nb = await activeServer.getNotebook(this.notebookUri);
+
+            // If we have an executing notebook, get its gather execution service.
+            if (nb) {
+                this.gatherProvider = nb.getGatherProvider();
+            }
         }
     }
 
