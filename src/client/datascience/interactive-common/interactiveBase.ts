@@ -1006,7 +1006,7 @@ export abstract class InteractiveBase extends WebViewHost<IInteractiveWindowMapp
         // This means a server that matches our options has started already. Use
         // it to ensure we have a notebook to run.
         if (server) {
-            await this.ensureNotebook(server);
+            await this.ensureServerAndNotebook();
         }
     }
 
