@@ -1,38 +1,27 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 'use strict';
-import '../../common/extensions';
-
-import { inject, injectable } from 'inversify';
+import { inject, injectable, multiInject, optional } from 'inversify';
 import * as uuid from 'uuid/v4';
 import { Uri } from 'vscode';
 import { CancellationToken } from 'vscode-jsonrpc';
 import * as vsls from 'vsls/vscode';
 import { IApplicationShell, ILiveShareApi, IWorkspaceService } from '../../common/application/types';
-// tslint:disable-next-line: no-duplicate-imports
 import '../../common/extensions';
 import { IFileSystem } from '../../common/platform/types';
 import { IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry } from '../../common/types';
 import { IInterpreterService } from '../../interpreter/contracts';
-import { IServiceContainer } from '../../ioc/types';
-import {
-    IConnection,
-    IDataScience,
-    IJupyterSessionManagerFactory,
-    INotebook,
-    INotebookServer,
-    INotebookServerLaunchInfo
-} from '../types';
+import { IConnection, IDataScience, IJupyterSessionManagerFactory, INotebook, INotebookExecutionLogger, INotebookServer, INotebookServerLaunchInfo } from '../types';
 import { GuestJupyterServer } from './liveshare/guestJupyterServer';
 import { HostJupyterServer } from './liveshare/hostJupyterServer';
 import { IRoleBasedObject, RoleBasedFactory } from './liveshare/roleBasedFactory';
 import { ILiveShareHasRole } from './liveshare/types';
 
-interface IJupyterServerInterface extends IRoleBasedObject, INotebookServer {}
+interface IJupyterServerInterface extends IRoleBasedObject, INotebookServer { }
 
 // tslint:disable:callable-types
 type JupyterServerClassType = {
-    new (
+    new(
         liveShare: ILiveShareApi,
         dataScience: IDataScience,
         asyncRegistry: IAsyncDisposableRegistry,
@@ -40,7 +29,7 @@ type JupyterServerClassType = {
         configService: IConfigurationService,
         sessionManager: IJupyterSessionManagerFactory,
         workspaceService: IWorkspaceService,
-        serviceContainer: IServiceContainer,
+        loggers: INotebookExecutionLogger[],
         appShell: IApplicationShell,
         fs: IFileSystem,
         interpreterService: IInterpreterService
@@ -48,8 +37,10 @@ type JupyterServerClassType = {
 };
 // tslint:enable:callable-types
 
+// This class wraps either a HostJupyterServer or a GuestJupyterServer based on the liveshare state. It abstracts
+// out the live share specific parts.
 @injectable()
-export class JupyterServerFactory implements INotebookServer, ILiveShareHasRole {
+export class JupyterServerWrapper implements INotebookServer, ILiveShareHasRole {
     private serverFactory: RoleBasedFactory<IJupyterServerInterface, JupyterServerClassType>;
 
     private launchInfo: INotebookServerLaunchInfo | undefined;
@@ -63,11 +54,13 @@ export class JupyterServerFactory implements INotebookServer, ILiveShareHasRole 
         @inject(IConfigurationService) configService: IConfigurationService,
         @inject(IJupyterSessionManagerFactory) sessionManager: IJupyterSessionManagerFactory,
         @inject(IWorkspaceService) workspaceService: IWorkspaceService,
-        @inject(IServiceContainer) serviceContainer: IServiceContainer,
+        @multiInject(INotebookExecutionLogger) @optional() loggers: INotebookExecutionLogger[] | undefined,
         @inject(IApplicationShell) appShell: IApplicationShell,
         @inject(IFileSystem) fs: IFileSystem,
         @inject(IInterpreterService) interpreterService: IInterpreterService
     ) {
+        // The server factory will create the appropriate HostJupyterServer or GuestJupyterServer based on
+        // the liveshare state.
         this.serverFactory = new RoleBasedFactory<IJupyterServerInterface, JupyterServerClassType>(
             liveShare,
             HostJupyterServer,
@@ -79,7 +72,7 @@ export class JupyterServerFactory implements INotebookServer, ILiveShareHasRole 
             configService,
             sessionManager,
             workspaceService,
-            serviceContainer,
+            loggers ? loggers : [],
             appShell,
             fs,
             interpreterService
