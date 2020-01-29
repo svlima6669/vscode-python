@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 'use strict';
-import { inject, injectable, multiInject, optional } from 'inversify';
+import { inject, injectable } from 'inversify';
 import * as uuid from 'uuid/v4';
 import { Uri } from 'vscode';
 import { CancellationToken } from 'vscode-jsonrpc';
@@ -11,7 +11,8 @@ import '../../common/extensions';
 import { IFileSystem } from '../../common/platform/types';
 import { IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry } from '../../common/types';
 import { IInterpreterService } from '../../interpreter/contracts';
-import { IConnection, IDataScience, IJupyterSessionManagerFactory, INotebook, INotebookExecutionLogger, INotebookServer, INotebookServerLaunchInfo } from '../types';
+import { IServiceContainer } from '../../ioc/types';
+import { IConnection, IDataScience, IJupyterSessionManagerFactory, INotebook, INotebookServer, INotebookServerLaunchInfo } from '../types';
 import { GuestJupyterServer } from './liveshare/guestJupyterServer';
 import { HostJupyterServer } from './liveshare/hostJupyterServer';
 import { IRoleBasedObject, RoleBasedFactory } from './liveshare/roleBasedFactory';
@@ -29,7 +30,7 @@ type JupyterServerClassType = {
         configService: IConfigurationService,
         sessionManager: IJupyterSessionManagerFactory,
         workspaceService: IWorkspaceService,
-        loggers: INotebookExecutionLogger[],
+        serviceContainer: IServiceContainer,
         appShell: IApplicationShell,
         fs: IFileSystem,
         interpreterService: IInterpreterService
@@ -54,7 +55,7 @@ export class JupyterServerWrapper implements INotebookServer, ILiveShareHasRole 
         @inject(IConfigurationService) configService: IConfigurationService,
         @inject(IJupyterSessionManagerFactory) sessionManager: IJupyterSessionManagerFactory,
         @inject(IWorkspaceService) workspaceService: IWorkspaceService,
-        @multiInject(INotebookExecutionLogger) @optional() loggers: INotebookExecutionLogger[] | undefined,
+        @inject(IServiceContainer) serviceContainer: IServiceContainer,
         @inject(IApplicationShell) appShell: IApplicationShell,
         @inject(IFileSystem) fs: IFileSystem,
         @inject(IInterpreterService) interpreterService: IInterpreterService
@@ -72,7 +73,7 @@ export class JupyterServerWrapper implements INotebookServer, ILiveShareHasRole 
             configService,
             sessionManager,
             workspaceService,
-            loggers ? loggers : [],
+            serviceContainer,
             appShell,
             fs,
             interpreterService
