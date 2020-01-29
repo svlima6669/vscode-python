@@ -59,6 +59,8 @@ export class JupyterServerWrapper implements INotebookServer, ILiveShareHasRole 
         @inject(IFileSystem) fs: IFileSystem,
         @inject(IInterpreterService) interpreterService: IInterpreterService
     ) {
+        // The server factory will create the appropriate HostJupyterServer or GuestJupyterServer based on
+        // the liveshare state.
         this.serverFactory = new RoleBasedFactory<IJupyterServerInterface, JupyterServerClassType>(
             liveShare,
             HostJupyterServer,
