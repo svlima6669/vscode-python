@@ -417,7 +417,7 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
         this.serviceManager.add<INotebookExporter>(INotebookExporter, JupyterExporter);
         this.serviceManager.addSingleton<ILiveShareApi>(ILiveShareApi, MockLiveShareApi);
         this.serviceManager.addSingleton<IExtensions>(IExtensions, MockExtensions);
-        this.serviceManager.addSingleton<INotebookServer>(INotebookServer, JupyterServerWrapper);
+        this.serviceManager.add<INotebookServer>(INotebookServer, JupyterServerWrapper);
         this.serviceManager.add<IJupyterCommandFactory>(IJupyterCommandFactory, JupyterCommandFactory);
         this.serviceManager.addSingleton<IThemeFinder>(IThemeFinder, ThemeFinder);
         this.serviceManager.addSingleton<ICodeCssGenerator>(ICodeCssGenerator, CodeCssGenerator);

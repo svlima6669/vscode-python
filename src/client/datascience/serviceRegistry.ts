@@ -111,7 +111,7 @@ export function registerTypes(serviceManager: IServiceManager) {
     serviceManager.add<IInteractiveWindow>(IInteractiveWindow, InteractiveWindow);
     serviceManager.add<INotebookExporter>(INotebookExporter, JupyterExporter);
     serviceManager.add<INotebookImporter>(INotebookImporter, JupyterImporter);
-    serviceManager.addSingleton<INotebookServer>(INotebookServer, JupyterServerWrapper);
+    serviceManager.add<INotebookServer>(INotebookServer, JupyterServerWrapper);
     serviceManager.addSingleton<ICodeCssGenerator>(ICodeCssGenerator, CodeCssGenerator);
     serviceManager.addSingleton<IJupyterPasswordConnect>(IJupyterPasswordConnect, JupyterPasswordConnect);
     serviceManager.addSingleton<IStatusProvider>(IStatusProvider, StatusProvider);
