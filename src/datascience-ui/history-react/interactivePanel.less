@@ -1,8 +1,66 @@
 /* Import common styles and then override them below */
 @import "../interactive-common/common.css";
 
+:root {
+    --right-offset-px: 20px;
+}
+
 .toolbar-menu-bar-child {
     background: var(--override-background, var(--vscode-editor-background));
     z-index: 10;
 }
 
+#main-panel-content {
+    grid-area: content;
+    max-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.messages-result-container {
+    width: calc(100vw - var(--right-offset-px));
+}
+
+.messages-result-container pre {
+    white-space: pre-wrap;
+    font-family: monospace;
+    margin: 0px;
+    word-break: break-all;
+}
+
+.cell-wrapper {
+    margin: 0px;
+    padding: 0px 0px 1px 0px;
+    display: block;
+}
+
+.cell-result-container {
+    margin: 0px;
+}
+
+.cell-outer {
+    display:grid;
+    grid-template-columns: auto 1fr 8px;
+    grid-column-gap: 3px;
+    width: 100%;
+}
+
+
+.cell-output {
+    overflow-x: scroll;
+    background: var(--override-widget-background, var(--vscode-notifications-background));
+}
+
+.cell-input {
+    margin: 0;
+}
+
+.markdown-cell-output {
+    overflow-x: scroll;
+}
+
+.cell-output-text {
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-x: hidden;
+}
