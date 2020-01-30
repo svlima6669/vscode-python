@@ -30,12 +30,13 @@
 
 .cell-wrapper {
     margin: 0px;
-    padding: 0px 0px 1px 0px;
+    padding: 0px;
     display: block;
 }
 
 .cell-result-container {
     margin: 0px;
+    display: grid;
 }
 
 .cell-outer {
@@ -47,9 +48,18 @@
 
 
 .cell-output {
+    margin: 0px;
     overflow-x: scroll;
+    background: transparent;
+}
+
+.cell-output>div {
     background: var(--override-widget-background, var(--vscode-notifications-background));
 }
+
+xmp {
+    margin: 0px;
+} 
 
 .cell-input {
     margin: 0;
