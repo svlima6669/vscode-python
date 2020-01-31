@@ -77,11 +77,19 @@ export class NativeEditorProvider implements INotebookEditorProvider, WebviewCus
     public get onEdit(): Event<{ readonly resource: Uri; readonly edit: INotebookEdit }> {
         return this._editEventEmitter.event;
     }
-    public applyEdits(_resource: Uri, _edits: readonly INotebookEdit[]): Thenable<void> {
-        return Promise.resolve();
+    public applyEdits(resource: Uri, edits: readonly INotebookEdit[]): Thenable<void> {
+        return this.loadModel(resource).then(s => {
+            if (s) {
+                edits.forEach(e => s.update(e.newCells, e.newDirty));
+            }
+        });
     }
-    public undoEdits(_resource: Uri, _edits: readonly INotebookEdit[]): Thenable<void> {
-        return Promise.resolve();
+    public undoEdits(resource: Uri, edits: readonly INotebookEdit[]): Thenable<void> {
+        return this.loadModel(resource).then(s => {
+            if (s) {
+                edits.forEach(e => s.update(e.oldCells, e.oldDirty));
+            }
+        });
     }
     public async resolveWebviewEditor(resource: Uri, panel: WebviewPanel) {
         try {
@@ -220,8 +228,8 @@ export class NativeEditorProvider implements INotebookEditorProvider, WebviewCus
             this.models.set(change.newFile.toString(), promise!);
         }
         // If the cells change, tell VS code about it
-        if (change.newCells && change.isDirty) {
-            this._editEventEmitter.fire({ resource: file, edit: { contents: change.newCells } });
+        if (change.newCells !== undefined && change.oldCells !== undefined && change.newDirty && change.oldDirty !== undefined && change.source !== 'vscode') {
+            this._editEventEmitter.fire({ resource: file, edit: { newCells: change.newCells, oldCells: change.oldCells, newDirty: change.newDirty, oldDirty: change.oldDirty } });
         }
     }
 

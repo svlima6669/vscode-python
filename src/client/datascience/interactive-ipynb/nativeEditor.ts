@@ -378,8 +378,11 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
         // Filter out sysinfo messages. Don't want to show those
         const filtered = cells.filter(c => c.data.cell_type !== 'messages');
 
-        // Update these cells in our storage
-        this.commandManager.executeCommand(Commands.NotebookStorage_ModifyCells, this.file, cells);
+        // Update these cells in our storage only when cells are finished
+        const finished = filtered.filter(c => c.state === CellState.finished || c.state === CellState.error);
+        if (finished.length > 0) {
+            this.commandManager.executeCommand(Commands.NotebookStorage_ModifyCells, this.file, finished);
+        }
 
         // Tell storage about our notebook object
         const notebook = this.getNotebook();
@@ -428,17 +431,22 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
         // Actually don't close, just let the error bubble out
     }
 
-    private modelChanged(change: INotebookModelChange) {
-        if (change.isDirty !== undefined) {
+    private async modelChanged(change: INotebookModelChange) {
+        if (change.source === 'vscode' && change.newCells !== undefined) {
+            // VS code is telling us to broadcast this to our UI. Tell the UI to reload the cells
+            await this.postMessage(InteractiveWindowMessages.LoadAllCells, { cells: change.newCells });
+        }
+
+        if (change.newDirty !== undefined) {
             this.modifiedEvent.fire();
-            if (change.model.isDirty) {
-                return this.postMessage(InteractiveWindowMessages.NotebookDirty);
+            if (change.newDirty) {
+                await this.postMessage(InteractiveWindowMessages.NotebookDirty);
             } else {
                 // Going clean should only happen on a save (for now. Undo might do this too)
                 this.savedEvent.fire(this);
 
                 // Then tell the UI
-                return this.postMessage(InteractiveWindowMessages.NotebookClean);
+                await this.postMessage(InteractiveWindowMessages.NotebookClean);
             }
         }
     }

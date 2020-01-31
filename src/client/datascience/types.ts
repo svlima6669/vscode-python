@@ -728,17 +728,21 @@ export interface IJupyterInterpreterDependencyManager {
 }
 
 export interface INotebookEdit {
-    readonly contents: ICell[];
+    readonly newCells: ICell[];
+    readonly oldCells: ICell[];
+    readonly oldDirty: boolean;
+    readonly newDirty: boolean;
 }
 
 export interface INotebookModelChange {
     model: INotebookModel;
     newFile?: Uri;
     oldFile?: Uri;
-    isDirty?: boolean;
-    isUntitled?: boolean;
+    newDirty?: boolean;
+    oldDirty?: boolean;
     newCells?: ICell[];
     oldCells?: ICell[];
+    source: 'vscode' | 'internal';
 }
 
 export interface INotebookModel {
@@ -749,6 +753,7 @@ export interface INotebookModel {
     readonly cells: ICell[];
     getJson(): Promise<Partial<nbformat.INotebookContent>>;
     getContent(cells?: ICell[]): Promise<string>;
+    update(cells: ICell[], isDirty: boolean): void;
 }
 
 export const INotebookStorage = Symbol('INotebookStorage');

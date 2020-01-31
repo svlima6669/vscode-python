@@ -207,6 +207,10 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
         return this;
     }
 
+    public update(cells: ICell[], isDirty: boolean): void {
+        this.setState({ cells, isDirty, source: 'vscode' });
+    }
+
     public save(): Promise<INotebookModel> {
         return this.saveAs(this.file);
     }
@@ -408,9 +412,10 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
         } as any) as nbformat.ICell; // nyc (code coverage) barfs on this so just trick it.
     }
 
-    private setState(newState: Partial<INativeEditorStorageState>) {
+    private setState(newState: Partial<INativeEditorStorageState> & { source?: 'vscode' | 'internal' }) {
         let changed = false;
-        const change: INotebookModelChange = { model: this };
+        const oldDirty = this.isDirty;
+        const change: INotebookModelChange = { model: this, source: newState.source ? newState.source : 'internal' };
         if (newState.file) {
             change.newFile = newState.file;
             change.oldFile = this.file;
@@ -425,13 +430,15 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
             this._state.cells = newState.cells;
 
             // Force dirty on a cell change
+            change.oldDirty = oldDirty;
             this._state.isDirty = true;
-            change.isDirty = true;
+            change.newDirty = true;
             changed = true;
         }
         if (newState.isDirty !== undefined && newState.isDirty !== this._state.isDirty) {
             // This should happen on save all (to put back the dirty cell change)
-            change.isDirty = newState.isDirty;
+            change.newDirty = newState.isDirty;
+            change.oldDirty = oldDirty;
             this._state.isDirty = newState.isDirty;
             changed = true;
         }
