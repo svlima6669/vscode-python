@@ -134,23 +134,23 @@ suite('DataScience code gathering unit tests', () => {
     pythonSettings.setup(p => p.datascience).returns(() => dataScienceSettings.object);
     configurationService.setup(c => c.getSettings(TypeMoq.It.isAny())).returns(() => pythonSettings.object);
     appShell.setup(a => a.showInformationMessage(TypeMoq.It.isAny(), TypeMoq.It.isAny())).returns(() => Promise.resolve(''));
-    // const GatherProvider = new GatherProvider(configurationService.object, appShell.object, disposableRegistry.object, commandManager.object);
-    // const gatherLogger = new GatherLogger(GatherProvider, configurationService.object);
+    const gatherProvider = new GatherProvider(configurationService.object, appShell.object, disposableRegistry.object, commandManager.object);
+    const gatherLogger = new GatherLogger(gatherProvider, configurationService.object);
 
-    // test('Logs a cell execution', async () => {
-    //     let count = 0;
-    //     for (const c of codeCells) {
-    //         await gatherLogger.postExecute(c, false);
-    //         count += 1;
-    //         assert.equal(GatherProvider.executionSlicer.executionLog.length, count);
-    //     }
-    // });
+    test('Logs a cell execution', async () => {
+        let count = 0;
+        for (const c of codeCells) {
+            await gatherLogger.postExecute(c, false);
+            count += 1;
+            assert.equal(gatherProvider.executionSlicer.executionLog.length, count);
+        }
+    });
 
-    // test('Gathers program slices for a cell', async () => {
-    //     const defaultCellMarker = '# %%';
-    //     const cell: IVscCell = codeCells[codeCells.length - 1];
-    //     const program = GatherProvider.gatherCode(cell);
-    //     const expectedProgram = `# This file contains only the code required to produce the results of the gathered cell.\n${defaultCellMarker}\nfrom bokeh.plotting import show, figure, output_notebook\n\n${defaultCellMarker}\nx = [1,2,3,4,5]\ny = [21,9,15,17,4]\n\n${defaultCellMarker}\np=figure(title='demo',x_axis_label='x',y_axis_label='y')\n\n${defaultCellMarker}\np.line(x,y,line_width=2)\n\n${defaultCellMarker}\nshow(p)\n`;
-    //     assert.equal(program.trim(), expectedProgram.trim());
-    // });
+    test('Gathers program slices for a cell', async () => {
+        const defaultCellMarker = '# %%';
+        const cell: IVscCell = codeCells[codeCells.length - 1];
+        const program = gatherProvider.gatherCode(cell);
+        const expectedProgram = `# This file contains only the code required to produce the results of the gathered cell.\n${defaultCellMarker}\nfrom bokeh.plotting import show, figure, output_notebook\n\n${defaultCellMarker}\nx = [1,2,3,4,5]\ny = [21,9,15,17,4]\n\n${defaultCellMarker}\np=figure(title='demo',x_axis_label='x',y_axis_label='y')\n\n${defaultCellMarker}\np.line(x,y,line_width=2)\n\n${defaultCellMarker}\nshow(p)\n`;
+        assert.equal(program.trim(), expectedProgram.trim());
+    });
 });
