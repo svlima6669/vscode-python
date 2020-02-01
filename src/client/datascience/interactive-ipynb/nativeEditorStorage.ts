@@ -164,6 +164,11 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
             case 'version':
                 this.updateVersionInfo(change.interpreter, change.kernelSpec);
                 break;
+            case 'file':
+                this._state.file = change.newFile;
+                NativeEditorStorage.storageMap.delete(change.oldFile.toString());
+                NativeEditorStorage.storageMap.set(change.newFile.toString(), this);
+                break;
             default:
                 break;
         }
@@ -316,6 +321,7 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
     private async loadFromFile(file: Uri, possibleContents?: string): Promise<ICell[]> {
         // Save file
         this._state.file = file;
+        NativeEditorStorage.storageMap.set(file.toString(), this);
 
         try {
             // Attempt to read the contents if a viable file
