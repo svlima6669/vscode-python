@@ -21,13 +21,10 @@ import { noop } from '../../../common/utils/misc';
 import { HiddenFileFormatString } from '../../../constants';
 import { IInterpreterService, PythonInterpreter } from '../../../interpreter/contracts';
 import { sendTelemetryWhenDone } from '../../../telemetry';
-import { Identifiers, Settings, Telemetry } from '../../constants';
-import { IInteractiveWindowListener, IInteractiveWindowProvider, IJupyterExecution, INotebook } from '../../types';
+import { Settings, Telemetry } from '../../constants';
+import { ICell, IInteractiveWindowListener, IInteractiveWindowProvider, IJupyterExecution, INotebook } from '../../types';
 import {
-    IAddCell,
     ICancelIntellisenseRequest,
-    IEditCell,
-    IInsertCell,
     IInteractiveWindowMapping,
     ILoadAllCells,
     INotebookIdentity,
@@ -35,9 +32,8 @@ import {
     IProvideCompletionItemsRequest,
     IProvideHoverRequest,
     IProvideSignatureHelpRequest,
-    IRemoveCell,
     IResolveCompletionItemRequest,
-    ISwapCells
+    NotebookModelChange
 } from '../interactiveWindowTypes';
 import {
     convertStringsToSuggestions,
@@ -109,28 +105,8 @@ export class IntellisenseProvider implements IInteractiveWindowListener {
                 this.dispatchMessage(message, payload, this.handleResolveCompletionItemRequest);
                 break;
 
-            case InteractiveWindowMessages.EditCell:
-                this.dispatchMessage(message, payload, this.editCell);
-                break;
-
-            case InteractiveWindowMessages.AddCell:
-                this.dispatchMessage(message, payload, this.addCell);
-                break;
-
-            case InteractiveWindowMessages.InsertCell:
-                this.dispatchMessage(message, payload, this.insertCell);
-                break;
-
-            case InteractiveWindowMessages.RemoveCell:
-                this.dispatchMessage(message, payload, this.removeCell);
-                break;
-
-            case InteractiveWindowMessages.SwapCells:
-                this.dispatchMessage(message, payload, this.swapCells);
-                break;
-
-            case InteractiveWindowMessages.DeleteAllCells:
-                this.dispatchMessage(message, payload, this.removeAllCells);
+            case InteractiveWindowMessages.UpdateModel:
+                this.dispatchMessage(message, payload, this.update);
                 break;
 
             case InteractiveWindowMessages.RestartKernel:
@@ -518,63 +494,95 @@ export class IntellisenseProvider implements IInteractiveWindowListener {
         );
     }
 
-    private async addCell(request: IAddCell): Promise<void> {
-        // Save this request file as our potential resource
-        if (request.cell.file !== Identifiers.EmptyFileName) {
-            this.potentialResource = Uri.file(request.cell.file);
-        }
-
-        // Get the document and then pass onto the sub class
-        const document = await this.getDocument(request.cell.file === Identifiers.EmptyFileName ? undefined : Uri.file(request.cell.file));
-        if (document) {
-            const changes = document.addCell(request.fullText, request.currentText, request.cell.id);
-            return this.handleChanges(document, changes);
-        }
-    }
-
-    private async insertCell(request: IInsertCell): Promise<void> {
-        // Get the document and then pass onto the sub class
-        const document = await this.getDocument();
-        if (document) {
-            const changes = document.insertCell(request.cell.id, request.code, request.codeCellAboveId);
-            return this.handleChanges(document, changes);
+    private async update(request: NotebookModelChange): Promise<void> {
+        // See where this request is coming from
+        switch (request.source) {
+            case 'redo':
+            case 'user':
+                return this.handleRedo(request);
+            case 'undo':
+                return this.handleUndo(request);
+            default:
+                break;
         }
     }
 
-    private async editCell(request: IEditCell): Promise<void> {
-        // First get the document
-        const document = await this.getDocument();
-        if (document) {
-            const changes = document.edit(request.changes, request.id);
-            return this.handleChanges(document, changes);
-        }
+    private convertToDocCells(cells: ICell[]): { code: string; id: string }[] {
+        return cells
+            .filter(c => c.data.cell_type === 'code')
+            .map(c => {
+                return { code: concatMultilineStringInput(c.data.source), id: c.id };
+            });
     }
 
-    private async removeCell(request: IRemoveCell): Promise<void> {
-        // First get the document
+    private async handleUndo(request: NotebookModelChange): Promise<void> {
         const document = await this.getDocument();
-        if (document) {
-            const changes = document.remove(request.id);
-            return this.handleChanges(document, changes);
+        let changes: TextDocumentContentChangeEvent[] = [];
+        switch (request.kind) {
+            case 'clear':
+                // This one can be ignored, it only clears outputs
+                break;
+            case 'edit':
+                changes = document.reloadCell(request.cell.id, concatMultilineStringInput(request.cell.data.source));
+                break;
+            case 'insert':
+                changes = document.remove(request.cell.id);
+                break;
+            case 'modify':
+                // This one can be ignored. it's only used for updating cell finished state.
+                break;
+            case 'remove':
+                changes = document.insertCell(request.cell.id, concatMultilineStringInput(request.cell.data.source), request.index);
+                break;
+            case 'remove_all':
+                changes = document.reloadCells(this.convertToDocCells(request.oldCells));
+                break;
+            case 'swap':
+                changes = document.swap(request.secondCellId, request.firstCellId);
+                break;
+            case 'version':
+                // Also ignored. updates version which we don't keep track of.
+                break;
+            default:
+                break;
         }
+
+        return this.handleChanges(document, changes);
     }
 
-    private async swapCells(request: ISwapCells): Promise<void> {
-        // First get the document
+    private async handleRedo(request: NotebookModelChange): Promise<void> {
         const document = await this.getDocument();
-        if (document) {
-            const changes = document.swap(request.firstCellId, request.secondCellId);
-            return this.handleChanges(document, changes);
+        let changes: TextDocumentContentChangeEvent[] = [];
+        switch (request.kind) {
+            case 'clear':
+                // This one can be ignored, it only clears outputs
+                break;
+            case 'edit':
+                changes = document.editCell(request.changes, request.cell.id);
+                break;
+            case 'insert':
+                changes = document.insertCell(request.cell.id, concatMultilineStringInput(request.cell.data.source), request.codeCellAboveId);
+                break;
+            case 'modify':
+                // This one can be ignored. it's only used for updating cell finished state.
+                break;
+            case 'remove':
+                changes = document.remove(request.cell.id);
+                break;
+            case 'remove_all':
+                changes = document.removeAll();
+                break;
+            case 'swap':
+                changes = document.swap(request.firstCellId, request.secondCellId);
+                break;
+            case 'version':
+                // Also ignored. updates version which we don't keep track of.
+                break;
+            default:
+                break;
         }
-    }
 
-    private async removeAllCells(): Promise<void> {
-        // First get the document
-        const document = await this.getDocument();
-        if (document) {
-            const changes = document.removeAll();
-            return this.handleChanges(document, changes);
-        }
+        return this.handleChanges(document, changes);
     }
 
     private async loadAllCells(payload: ILoadAllCells) {

@@ -2,10 +2,13 @@
 // Licensed under the MIT License.
 'use strict';
 import * as monacoEditor from 'monaco-editor/esm/vs/editor/editor.api';
+import { Uri } from 'vscode';
 import { IServerState } from '../../../datascience-ui/interactive-common/mainState';
 import { IAddCellAction } from '../../../datascience-ui/interactive-common/redux/reducers/types';
+import { PythonInterpreter } from '../../interpreter/contracts';
+import { LiveKernelModel } from '../jupyter/kernels/types';
 import { CssMessages, IGetCssRequest, IGetCssResponse, IGetMonacoThemeRequest } from '../messages';
-import { ICell, IInteractiveWindowInfo, IJupyterVariable, IJupyterVariablesRequest, IJupyterVariablesResponse } from '../types';
+import { ICell, IInteractiveWindowInfo, IJupyterKernelSpec, IJupyterVariable, IJupyterVariablesRequest, IJupyterVariablesResponse } from '../types';
 
 export enum InteractiveWindowMessages {
     StartCell = 'start_cell',
@@ -18,7 +21,6 @@ export enum InteractiveWindowMessages {
     Export = 'export_to_ipynb',
     GetAllCells = 'get_all_cells',
     ReturnAllCells = 'return_all_cells',
-    DeleteCell = 'delete_cell',
     DeleteAllCells = 'delete_all_cells',
     Undo = 'undo',
     Redo = 'redo',
@@ -53,11 +55,6 @@ export enum InteractiveWindowMessages {
     ResolveCompletionItemRequest = 'resolve_completion_item_request',
     CancelResolveCompletionItemRequest = 'cancel_resolve_completion_item_request',
     ResolveCompletionItemResponse = 'resolve_completion_item_response',
-    AddCell = 'add_cell',
-    EditCell = 'edit_cell',
-    RemoveCell = 'remove_cell',
-    SwapCells = 'swap_cells',
-    InsertCell = 'insert_cell',
     LoadOnigasmAssemblyRequest = 'load_onigasm_assembly_request',
     LoadOnigasmAssemblyResponse = 'load_onigasm_assembly_response',
     LoadTmLanguageRequest = 'load_tmlanguage_request',
@@ -88,7 +85,8 @@ export enum InteractiveWindowMessages {
     ClearAllOutputs = 'clear_all_outputs',
     SelectKernel = 'select_kernel',
     UpdateKernel = 'update_kernel',
-    SelectJupyterServer = 'select_jupyter_server'
+    SelectJupyterServer = 'select_jupyter_server',
+    UpdateModel = 'update_model'
 }
 
 export enum NativeCommandType {
@@ -293,6 +291,117 @@ export interface IFocusedCellEditor {
     cellId: string;
 }
 
+export interface INotebookModelChange {
+    oldDirty: boolean;
+    newDirty: boolean;
+    source: 'undo' | 'user' | 'redo';
+}
+
+export interface INotebookModelRemoveAllChange extends INotebookModelChange {
+    kind: 'remove_all';
+    oldCells: ICell[];
+    newCellId: string;
+}
+export interface INotebookModelModifyChange extends INotebookModelChange {
+    kind: 'modify';
+    newCells: ICell[];
+    oldCells: ICell[];
+}
+
+export interface INotebookModelClearChange extends INotebookModelChange {
+    kind: 'clear';
+    oldCells: ICell[];
+}
+
+export interface INotebookModelSwapChange extends INotebookModelChange {
+    kind: 'swap';
+    firstCellId: string;
+    secondCellId: string;
+}
+
+export interface INotebookModelRemoveChange extends INotebookModelChange {
+    kind: 'remove';
+    cell: ICell;
+    index: number;
+}
+
+export interface INotebookModelInsertChange extends INotebookModelChange {
+    kind: 'insert';
+    cell: ICell;
+    index: number;
+    codeCellAboveId?: string;
+    fullText: string;
+    currentText: string;
+}
+
+export interface IRange {
+    /**
+     * Line number on which the range starts (starts at 1).
+     */
+    readonly startLineNumber: number;
+    /**
+     * Column on which the range starts in line `startLineNumber` (starts at 1).
+     */
+    readonly startColumn: number;
+    /**
+     * Line number on which the range ends.
+     */
+    readonly endLineNumber: number;
+    /**
+     * Column on which the range ends in line `endLineNumber`.
+     */
+    readonly endColumn: number;
+}
+
+export interface ICellContentChange {
+    /**
+     * The range that got replaced.
+     */
+    readonly range: IRange;
+    /**
+     * The offset of the range that got replaced.
+     */
+    readonly rangeOffset: number;
+    /**
+     * The length of the range that got replaced.
+     */
+    readonly rangeLength: number;
+    /**
+     * The new text for the range.
+     */
+    readonly text: string;
+}
+
+export interface INotebookModelEditChange extends INotebookModelChange {
+    kind: 'edit';
+    changes: ICellContentChange[];
+    newText: string;
+    cell: ICell;
+}
+
+export interface INotebookModelVersionChange extends INotebookModelChange {
+    kind: 'version';
+    interpreter: PythonInterpreter | undefined;
+    kernelSpec: IJupyterKernelSpec | LiveKernelModel | undefined;
+}
+
+export interface INotebookModelFileChange extends INotebookModelChange {
+    kind: 'file';
+    newFile: Uri;
+    oldFile: Uri;
+}
+
+export type NotebookModelChange =
+    | INotebookModelModifyChange
+    | INotebookModelRemoveAllChange
+    | INotebookModelClearChange
+    | INotebookModelSwapChange
+    | INotebookModelRemoveChange
+    | INotebookModelInsertChange
+    | INotebookModelEditChange
+    | INotebookModelVersionChange
+    | INotebookModelFileChange;
+
 // Map all messages to specific payloads
 export class IInteractiveWindowMapping {
     public [InteractiveWindowMessages.StartCell]: ICell;
@@ -307,7 +416,6 @@ export class IInteractiveWindowMapping {
     public [InteractiveWindowMessages.Export]: ICell[];
     public [InteractiveWindowMessages.GetAllCells]: ICell;
     public [InteractiveWindowMessages.ReturnAllCells]: ICell[];
-    public [InteractiveWindowMessages.DeleteCell]: never | undefined;
     public [InteractiveWindowMessages.DeleteAllCells]: IAddCellAction;
     public [InteractiveWindowMessages.Undo]: never | undefined;
     public [InteractiveWindowMessages.Redo]: never | undefined;
@@ -343,11 +451,6 @@ export class IInteractiveWindowMapping {
     public [InteractiveWindowMessages.ResolveCompletionItemRequest]: IResolveCompletionItemRequest;
     public [InteractiveWindowMessages.CancelResolveCompletionItemRequest]: ICancelIntellisenseRequest;
     public [InteractiveWindowMessages.ResolveCompletionItemResponse]: IResolveCompletionItemResponse;
-    public [InteractiveWindowMessages.AddCell]: IAddCell;
-    public [InteractiveWindowMessages.EditCell]: IEditCell;
-    public [InteractiveWindowMessages.RemoveCell]: IRemoveCell;
-    public [InteractiveWindowMessages.SwapCells]: ISwapCells;
-    public [InteractiveWindowMessages.InsertCell]: IInsertCell;
     public [InteractiveWindowMessages.LoadOnigasmAssemblyRequest]: never | undefined;
     public [InteractiveWindowMessages.LoadOnigasmAssemblyResponse]: Buffer;
     public [InteractiveWindowMessages.LoadTmLanguageRequest]: never | undefined;
@@ -377,4 +480,5 @@ export class IInteractiveWindowMapping {
     public [InteractiveWindowMessages.MonacoReady]: never | undefined;
     public [InteractiveWindowMessages.ClearAllOutputs]: never | undefined;
     public [InteractiveWindowMessages.UpdateKernel]: IServerState | undefined;
+    public [InteractiveWindowMessages.UpdateModel]: NotebookModelChange;
 }

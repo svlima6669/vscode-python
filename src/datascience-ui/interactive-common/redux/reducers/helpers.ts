@@ -44,6 +44,12 @@ export namespace Helpers {
         return cvm as ICellViewModel;
     }
 
+    // This function is because the unit test typescript compiler can't handle ICell.metadata
+    // tslint:disable-next-line: no-any
+    export function asCell(cell: any): ICell {
+        return cell as ICell;
+    }
+
     export function updateOrAdd<T>(arg: CommonReducerArg<T, ICell>, generateVM: (cell: ICell, mainState: IMainState) => ICellViewModel): IMainState {
         // First compute new execution count.
         const newExecutionCount = arg.payload.data.execution_count

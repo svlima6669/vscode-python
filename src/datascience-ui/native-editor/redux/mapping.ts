@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 'use strict';
-import { ILoadAllCells } from '../../../client/datascience/interactive-common/interactiveWindowTypes';
+import { ILoadAllCells, NotebookModelChange } from '../../../client/datascience/interactive-common/interactiveWindowTypes';
 import { IGetCssResponse } from '../../../client/datascience/messages';
 import { IGetMonacoThemeResponse } from '../../../client/datascience/monacoMessages';
 import { ICell } from '../../../client/datascience/types';
@@ -90,4 +90,5 @@ export class INativeEditorActionMapping {
     public [IncomingMessageActions.GETMONACOTHEMERESPONSE]: NativeEditorReducerFunc<IGetMonacoThemeResponse>;
     public [IncomingMessageActions.UPDATEKERNEL]: NativeEditorReducerFunc<IServerState>;
     public [IncomingMessageActions.LOCINIT]: NativeEditorReducerFunc<string>;
+    public [IncomingMessageActions.UPDATEMODEL]: NativeEditorReducerFunc<NotebookModelChange>;
 }

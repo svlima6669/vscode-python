@@ -4,7 +4,8 @@ import { Disposable, Uri, WebviewPanel, WebviewPanelOptions } from 'vscode';
 import { ICommandManager, ICustomEditorService, WebviewCustomEditorEditingDelegate, WebviewCustomEditorProvider } from '../../client/common/application/types';
 import { IDisposableRegistry } from '../../client/common/types';
 import { noop } from '../../client/common/utils/misc';
-import { INotebookEdit, INotebookEditor, INotebookEditorProvider } from '../../client/datascience/types';
+import { NotebookModelChange } from '../../client/datascience/interactive-common/interactiveWindowTypes';
+import { INotebookEditor, INotebookEditorProvider } from '../../client/datascience/types';
 
 export class MockCustomEditorService implements ICustomEditorService {
     private provider: WebviewCustomEditorProvider | undefined;
@@ -43,14 +44,14 @@ export class MockCustomEditorService implements ICustomEditorService {
     }
 
     private onFileSave(file: Uri) {
-        const nativeProvider = (this.provider as unknown) as WebviewCustomEditorEditingDelegate<INotebookEdit>;
+        const nativeProvider = (this.provider as unknown) as WebviewCustomEditorEditingDelegate<NotebookModelChange>;
         if (nativeProvider) {
             nativeProvider.save(file);
         }
     }
 
     private onFileSaveAs(file: Uri) {
-        const nativeProvider = (this.provider as unknown) as WebviewCustomEditorEditingDelegate<INotebookEdit>;
+        const nativeProvider = (this.provider as unknown) as WebviewCustomEditorEditingDelegate<NotebookModelChange>;
         if (nativeProvider) {
             // Just make up a new URI
             nativeProvider.saveAs(file, Uri.file('bar.ipynb'));

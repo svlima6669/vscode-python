@@ -1,8 +1,10 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 'use strict';
-import { InteractiveWindowMessages } from '../../../../client/datascience/interactive-common/interactiveWindowTypes';
+import { ICellContentChange, InteractiveWindowMessages, NotebookModelChange } from '../../../../client/datascience/interactive-common/interactiveWindowTypes';
 import { CssMessages } from '../../../../client/datascience/messages';
+import { ICell } from '../../../../client/datascience/types';
+import { concatMultilineStringInput } from '../../../common';
 import { extractInputText, IMainState } from '../../mainState';
 import { createPostableAction } from '../postOffice';
 import { Helpers } from './helpers';
@@ -89,9 +91,88 @@ export namespace Transfer {
         return arg.prevState;
     }
 
+    function postModelUpdate<T>(arg: CommonReducerArg<T>, update: NotebookModelChange) {
+        arg.queueAction(createPostableAction(InteractiveWindowMessages.UpdateModel, update));
+    }
+
+    export function postModelEdit<T>(arg: CommonReducerArg<T>, changes: ICellContentChange[], cell: ICell, newText: string) {
+        postModelUpdate(arg, {
+            source: 'user',
+            kind: 'edit',
+            newDirty: true,
+            oldDirty: arg.prevState.dirty,
+            changes,
+            cell,
+            newText
+        });
+    }
+
+    export function postModelInsert<T>(arg: CommonReducerArg<T>, index: number, cell: ICell, codeCellAboveId?: string, fullText?: string, currentText?: string) {
+        const trueFullText = fullText === undefined ? concatMultilineStringInput(cell.data.source) : fullText;
+        const trueCurrentText = currentText === undefined ? trueFullText : currentText;
+        postModelUpdate(arg, {
+            source: 'user',
+            kind: 'insert',
+            newDirty: true,
+            oldDirty: arg.prevState.dirty,
+            index,
+            cell,
+            codeCellAboveId,
+            fullText: trueFullText,
+            currentText: trueCurrentText
+        });
+    }
+
+    export function postModelRemove<T>(arg: CommonReducerArg<T>, index: number, cell: ICell) {
+        postModelUpdate(arg, {
+            source: 'user',
+            kind: 'remove',
+            oldDirty: arg.prevState.dirty,
+            newDirty: true,
+            cell,
+            index
+        });
+    }
+
+    export function postModelClearOutputs<T>(arg: CommonReducerArg<T>) {
+        postModelUpdate(arg, {
+            source: 'user',
+            kind: 'clear',
+            oldDirty: arg.prevState.dirty,
+            newDirty: true,
+            // tslint:disable-next-line: no-any
+            oldCells: arg.prevState.cellVMs.map(c => c.cell as any) as ICell[]
+        });
+    }
+
+    export function postModelRemoveAll<T>(arg: CommonReducerArg<T>, newCellId: string) {
+        postModelUpdate(arg, {
+            source: 'user',
+            kind: 'remove_all',
+            oldDirty: arg.prevState.dirty,
+            newDirty: true,
+            // tslint:disable-next-line: no-any
+            oldCells: arg.prevState.cellVMs.map(c => c.cell as any) as ICell[],
+            newCellId
+        });
+    }
+
+    export function postModelSwap<T>(arg: CommonReducerArg<T>, firstCellId: string, secondCellId: string) {
+        postModelUpdate(arg, {
+            source: 'user',
+            kind: 'swap',
+            oldDirty: arg.prevState.dirty,
+            newDirty: true,
+            firstCellId,
+            secondCellId
+        });
+    }
+
     export function editCell<T>(arg: CommonReducerArg<T, IEditCellAction>): IMainState {
-        if (arg.payload.cellId) {
-            arg.queueAction(createPostableAction(InteractiveWindowMessages.EditCell, { changes: arg.payload.changes, id: arg.payload.cellId }));
+        const cellVM = arg.prevState.cellVMs.find(c => c.cell.id === arg.payload.cellId);
+        if (cellVM) {
+            // Tell the underlying model on the extension side
+            postModelEdit(arg, arg.payload.changes, cellVM.cell, arg.payload.code);
 
             // Update the uncomitted text on the cell view model
             // We keep this saved here so we don't re-render and we put this code into the input / code data

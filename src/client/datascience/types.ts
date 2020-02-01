@@ -14,6 +14,7 @@ import { IAsyncDisposable, IDataScienceSettings, IDisposable } from '../common/t
 import { StopWatch } from '../common/utils/stopWatch';
 import { PythonInterpreter } from '../interpreter/contracts';
 import { JupyterCommands } from './constants';
+import { NotebookModelChange } from './interactive-common/interactiveWindowTypes';
 import { JupyterServerInfo } from './jupyter/jupyterConnection';
 import { JupyterInstallError } from './jupyter/jupyterInstallError';
 import { JupyterKernelSpec } from './jupyter/kernels/jupyterKernelSpec';
@@ -727,33 +728,14 @@ export interface IJupyterInterpreterDependencyManager {
     installMissingDependencies(err?: JupyterInstallError): Promise<void>;
 }
 
-export interface INotebookEdit {
-    readonly newCells: ICell[];
-    readonly oldCells: ICell[];
-    readonly oldDirty: boolean;
-    readonly newDirty: boolean;
-}
-
-export interface INotebookModelChange {
-    model: INotebookModel;
-    newFile?: Uri;
-    oldFile?: Uri;
-    newDirty?: boolean;
-    oldDirty?: boolean;
-    newCells?: ICell[];
-    oldCells?: ICell[];
-    source: 'vscode' | 'internal';
-}
-
 export interface INotebookModel {
     readonly file: Uri;
     readonly isDirty: boolean;
     readonly isUntitled: boolean;
-    readonly changed: Event<INotebookModelChange>;
+    readonly changed: Event<NotebookModelChange>;
     readonly cells: ICell[];
     getJson(): Promise<Partial<nbformat.INotebookContent>>;
     getContent(cells?: ICell[]): Promise<string>;
-    update(cells: ICell[], isDirty: boolean): void;
 }
 
 export const INotebookStorage = Symbol('INotebookStorage');
@@ -762,4 +744,5 @@ export interface INotebookStorage {
     load(file: Uri, contents?: string): Promise<INotebookModel>;
     save(): Promise<INotebookModel>;
     saveAs(file: Uri): Promise<INotebookModel>;
+    update(change: NotebookModelChange): void;
 }

@@ -1,5 +1,4 @@
 import { nbformat } from '@jupyterlab/coreutils';
-import * as fastDeepEqual from 'fast-deep-equal';
 import { inject, injectable, named } from 'inversify';
 import * as path from 'path';
 import * as uuid from 'uuid/v4';
@@ -13,10 +12,10 @@ import { GLOBAL_MEMENTO, ICryptoUtils, IDisposable, IDisposableRegistry, IExtens
 import { noop } from '../../common/utils/misc';
 import { PythonInterpreter } from '../../interpreter/contracts';
 import { Commands, Identifiers } from '../constants';
-import { IEditCell, IInsertCell, ISwapCells } from '../interactive-common/interactiveWindowTypes';
+import { ICellContentChange, NotebookModelChange } from '../interactive-common/interactiveWindowTypes';
 import { InvalidNotebookFileError } from '../jupyter/invalidNotebookFileError';
 import { LiveKernelModel } from '../jupyter/kernels/types';
-import { CellState, ICell, IJupyterExecution, IJupyterKernelSpec, INotebookModel, INotebookModelChange, INotebookStorage } from '../types';
+import { CellState, ICell, IJupyterExecution, IJupyterKernelSpec, INotebookModel, INotebookStorage } from '../types';
 
 // tslint:disable-next-line:no-require-imports no-var-requires
 import detectIndent = require('detect-indent');
@@ -36,7 +35,7 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
     public get isDirty(): boolean {
         return this._state.isDirty;
     }
-    public get changed(): Event<INotebookModelChange> {
+    public get changed(): Event<NotebookModelChange> {
         return this._changedEmitter.event;
     }
     public get file(): Uri {
@@ -52,7 +51,7 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
     private static signedUpForCommands = false;
 
     private static storageMap = new Map<string, NativeEditorStorage>();
-    private _changedEmitter = new EventEmitter<INotebookModelChange>();
+    private _changedEmitter = new EventEmitter<NotebookModelChange>();
     private _state: INativeEditorStorageState = { file: Uri.file(''), isDirty: false, cells: [], notebookJson: {} };
     private _loadPromise: Promise<ICell[]> | undefined;
     private indentAmount: string = ' ';
@@ -83,119 +82,6 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
         return undefined;
     }
 
-    private static async handleEdit(s: NativeEditorStorage, request: IEditCell): Promise<void> {
-        // Apply the changes to the visible cell list. We won't get an update until
-        // submission otherwise
-        if (request.changes && request.changes.length) {
-            const change = request.changes[0];
-            const normalized = change.text.replace(/\r/g, '');
-
-            // Figure out which cell we're editing.
-            const index = s.cells.findIndex(c => c.id === request.id);
-            if (index >= 0) {
-                // This is an actual edit.
-                const contents = concatMultilineStringInput(s.cells[index].data.source);
-                const before = contents.substr(0, change.rangeOffset);
-                const after = contents.substr(change.rangeOffset + change.rangeLength);
-                const newContents = `${before}${normalized}${after}`;
-                if (contents !== newContents) {
-                    const newCells = [...s.cells];
-                    const newCell = { ...newCells[index], data: { ...newCells[index].data, source: newContents } };
-                    newCells[index] = NativeEditorStorage.asCell(newCell);
-                    s.setState({ cells: newCells });
-                }
-            }
-        }
-    }
-
-    private static async handleInsert(s: NativeEditorStorage, request: IInsertCell): Promise<void> {
-        // Insert a cell into our visible list based on the index. They should be in sync
-        const newCells = [...s.cells];
-        newCells.splice(request.index, 0, request.cell);
-        s.setState({ cells: newCells });
-    }
-
-    private static async handleRemoveCell(s: NativeEditorStorage, id: string): Promise<void> {
-        // Filter our list
-        const newCells = [...s.cells].filter(v => v.id !== id);
-        if (newCells.length !== s.cells.length) {
-            s.setState({ cells: newCells });
-        }
-    }
-
-    private static async handleSwapCells(s: NativeEditorStorage, request: ISwapCells): Promise<void> {
-        // Swap two cells in our list
-        const first = s.cells.findIndex(v => v.id === request.firstCellId);
-        const second = s.cells.findIndex(v => v.id === request.secondCellId);
-        if (first >= 0 && second >= 0) {
-            const newCells = [...s.cells];
-            const temp = { ...newCells[first] };
-            newCells[first] = NativeEditorStorage.asCell(newCells[second]);
-            newCells[second] = NativeEditorStorage.asCell(temp);
-            s.setState({ cells: newCells });
-        }
-    }
-
-    private static async handleDeleteAllCells(s: NativeEditorStorage): Promise<void> {
-        if (s.cells.length !== 0) {
-            s.setState({ cells: [] });
-        }
-    }
-
-    private static async handleClearAllOutputs(s: NativeEditorStorage): Promise<void> {
-        const newCells = s.cells.map(c => {
-            return NativeEditorStorage.asCell({ ...c, data: { ...c.data, execution_count: null, outputs: [] } });
-        });
-
-        // Do our check here to see if any changes happened. We don't want
-        // to fire an unnecessary change if we can help it.
-        if (!fastDeepEqual(s.cells, newCells)) {
-            s.setState({ cells: newCells });
-        }
-    }
-
-    private static async handleModifyCells(s: NativeEditorStorage, cells: ICell[]): Promise<void> {
-        const newCells = [...s.cells];
-        // Update these cells in our list
-        cells.forEach(c => {
-            const index = newCells.findIndex(v => v.id === c.id);
-            newCells[index] = NativeEditorStorage.asCell(c);
-        });
-
-        // Indicate dirty
-        if (!fastDeepEqual(newCells, s.cells)) {
-            s.setState({ cells: newCells, isDirty: true });
-        }
-    }
-
-    private static async handleUpdateVersionInfo(
-        s: NativeEditorStorage,
-        interpreter: PythonInterpreter | undefined,
-        kernelSpec: IJupyterKernelSpec | LiveKernelModel | undefined
-    ): Promise<void> {
-        // Get our kernel_info and language_info from the current notebook
-        if (interpreter && interpreter.version && s._state.notebookJson.metadata && s._state.notebookJson.metadata.language_info) {
-            s._state.notebookJson.metadata.language_info.version = interpreter.version.raw;
-        }
-
-        if (kernelSpec && s._state.notebookJson.metadata && !s._state.notebookJson.metadata.kernelspec) {
-            // Add a new spec in this case
-            s._state.notebookJson.metadata.kernelspec = {
-                name: kernelSpec.name || kernelSpec.display_name || '',
-                display_name: kernelSpec.display_name || kernelSpec.name || ''
-            };
-        } else if (kernelSpec && s._state.notebookJson.metadata && s._state.notebookJson.metadata.kernelspec) {
-            // Spec exists, just update name and display_name
-            s._state.notebookJson.metadata.kernelspec.name = kernelSpec.name || kernelSpec.display_name || '';
-            s._state.notebookJson.metadata.kernelspec.display_name = kernelSpec.display_name || kernelSpec.name || '';
-        }
-    }
-
-    // tslint:disable-next-line: no-any
-    private static asCell(cell: any): ICell {
-        return cell as ICell;
-    }
-
     public dispose(): void {
         NativeEditorStorage.storageMap.delete(this.file.toString());
     }
@@ -207,8 +93,8 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
         return this;
     }
 
-    public update(cells: ICell[], isDirty: boolean): void {
-        this.setState({ cells, isDirty, source: 'vscode' });
+    public update(change: NotebookModelChange): void {
+        this.handleModelChange(change);
     }
 
     public save(): Promise<INotebookModel> {
@@ -219,7 +105,7 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
         const contents = await this.getContent();
         await this.fileSystem.writeFile(file.fsPath, contents, 'utf-8');
         if (this.isDirty || file.fsPath !== this.file.fsPath) {
-            this.setState({ isDirty: false, file });
+            this.handleModelChange({ source: 'user', kind: 'file', newFile: file, oldFile: this.file, newDirty: false, oldDirty: this.isDirty });
         }
         return this;
     }
@@ -233,13 +119,180 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
         return this.generateNotebookContent(cells ? cells : this.cells);
     }
 
-    // tslint:disable-next-line: no-any
-    private async commandCallback(handler: (...any: [NativeEditorStorage, ...any[]]) => Promise<any>, resource: Uri) {
-        const args = Array.prototype.slice.call(arguments).slice(2);
-        const storage = await NativeEditorStorage.getStorage(resource);
-        if (storage) {
-            return handler(storage, ...args);
+    private handleModelChange(change: NotebookModelChange) {
+        const oldDirty = this.isDirty;
+
+        switch (change.source) {
+            case 'redo':
+            case 'user':
+                this.handleRedo(change);
+                break;
+            case 'undo':
+                this.handleUndo(change);
+                break;
+            default:
+                break;
         }
+
+        // Forward onto our listeners (modifying dirty)
+        this._changedEmitter.fire({ ...change, newDirty: this.isDirty, oldDirty });
+    }
+
+    private handleRedo(change: NotebookModelChange) {
+        switch (change.kind) {
+            case 'clear':
+                this.clearOutputs();
+                break;
+            case 'edit':
+                this.editCell(change.changes, change.cell.id);
+                break;
+            case 'insert':
+                this.insertCell(change.cell, change.index);
+                break;
+            case 'modify':
+                this.updateCellState(change.newCells);
+                break;
+            case 'remove':
+                this.removeCell(change.cell);
+                break;
+            case 'remove_all':
+                this.removeAllCells(change.newCellId);
+                break;
+            case 'swap':
+                this.swapCells(change.firstCellId, change.secondCellId);
+                break;
+            case 'version':
+                this.updateVersionInfo(change.interpreter, change.kernelSpec);
+                break;
+            default:
+                break;
+        }
+        this._state.isDirty = change.kind !== 'version';
+    }
+
+    private handleUndo(change: NotebookModelChange) {
+        switch (change.kind) {
+            case 'clear':
+                this._state.cells = change.oldCells;
+                break;
+            case 'edit':
+                this.replaceCell(change.cell);
+                break;
+            case 'insert':
+                this.removeCell(change.cell);
+                break;
+            case 'modify':
+                this.updateCellState(change.oldCells);
+                break;
+            case 'remove':
+                this.insertCell(change.cell, change.index);
+                break;
+            case 'remove_all':
+                this._state.cells = change.oldCells;
+                break;
+            case 'swap':
+                this.swapCells(change.firstCellId, change.secondCellId);
+                break;
+            case 'version':
+                // Not supporting undo
+                break;
+            default:
+                break;
+        }
+
+        // Dirty state comes from undo
+        this._state.isDirty = change.oldDirty;
+    }
+
+    private removeAllCells(newCellId: string) {
+        this._state.cells = [];
+        this._state.cells.push(this.createEmptyCell(newCellId));
+    }
+
+    private editCell(changes: ICellContentChange[], id: string) {
+        // Apply the changes to the visible cell list. We won't get an update until
+        // submission otherwise
+        if (changes && changes.length) {
+            const change = changes[0];
+            const normalized = change.text.replace(/\r/g, '');
+
+            // Figure out which cell we're editing.
+            const index = this.cells.findIndex(c => c.id === id);
+            if (index >= 0) {
+                // This is an actual edit.
+                const contents = concatMultilineStringInput(this.cells[index].data.source);
+                const before = contents.substr(0, change.rangeOffset);
+                const after = contents.substr(change.rangeOffset + change.rangeLength);
+                const newContents = `${before}${normalized}${after}`;
+                if (contents !== newContents) {
+                    const newCell = { ...this.cells[index], data: { ...this.cells[index].data, source: newContents } };
+                    this._state.cells[index] = this.asCell(newCell);
+                }
+            }
+        }
+    }
+
+    private swapCells(firstCellId: string, secondCellId: string) {
+        const first = this.cells.findIndex(v => v.id === firstCellId);
+        const second = this.cells.findIndex(v => v.id === secondCellId);
+        if (first >= 0 && second >= 0) {
+            const temp = { ...this.cells[first] };
+            this._state.cells[first] = this.asCell(this.cells[second]);
+            this._state.cells[second] = this.asCell(temp);
+        }
+    }
+
+    private updateCellState(cells: ICell[]) {
+        // Update these cells in our list
+        cells.forEach(c => {
+            const index = this.cells.findIndex(v => v.id === c.id);
+            this._state.cells[index] = this.asCell(c);
+        });
+    }
+
+    private removeCell(cell: ICell) {
+        this._state.cells = this.cells.filter(c => c.id !== cell.id);
+    }
+
+    private replaceCell(cell: ICell) {
+        const index = this.cells.findIndex(c => c.id === cell.id);
+        if (index >= 0) {
+            this._state.cells[index] = cell;
+        }
+    }
+
+    private clearOutputs() {
+        this._state.cells = this.cells.map(c => this.asCell({ ...c, data: { ...c.data, execution_count: null, outputs: [] } }));
+    }
+
+    private insertCell(cell: ICell, index: number) {
+        // Insert a cell into our visible list based on the index. They should be in sync
+        this._state.cells.splice(index, 0, cell);
+    }
+
+    private updateVersionInfo(interpreter: PythonInterpreter | undefined, kernelSpec: IJupyterKernelSpec | LiveKernelModel | undefined) {
+        // Get our kernel_info and language_info from the current notebook
+        if (interpreter && interpreter.version && this._state.notebookJson.metadata && this._state.notebookJson.metadata.language_info) {
+            this._state.notebookJson.metadata.language_info.version = interpreter.version.raw;
+        }
+
+        if (kernelSpec && this._state.notebookJson.metadata && !this._state.notebookJson.metadata.kernelspec) {
+            // Add a new spec in this case
+            this._state.notebookJson.metadata.kernelspec = {
+                name: kernelSpec.name || kernelSpec.display_name || '',
+                display_name: kernelSpec.display_name || kernelSpec.name || ''
+            };
+        } else if (kernelSpec && this._state.notebookJson.metadata && this._state.notebookJson.metadata.kernelspec) {
+            // Spec exists, just update name and display_name
+            this._state.notebookJson.metadata.kernelspec.name = kernelSpec.name || kernelSpec.display_name || '';
+            this._state.notebookJson.metadata.kernelspec.display_name = kernelSpec.display_name || kernelSpec.name || '';
+        }
+    }
+
+    // tslint:disable-next-line: no-any
+    private asCell(cell: any): ICell {
+        // Works around problems with setting a cell to another one in the nyc compiler.
+        return cell as ICell;
     }
 
     private registerCommands(commandManager: ICommandManager, disposableRegistry: IDisposableRegistry): void {
@@ -250,24 +303,19 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
             }
         });
         disposableRegistry.push(
-            commandManager.registerCommand(Commands.NotebookStorage_ClearCellOutputs, this.commandCallback.bind(undefined, NativeEditorStorage.handleClearAllOutputs))
-        );
-        disposableRegistry.push(
-            commandManager.registerCommand(Commands.NotebookStorage_DeleteAllCells, this.commandCallback.bind(undefined, NativeEditorStorage.handleDeleteAllCells))
-        );
-        disposableRegistry.push(commandManager.registerCommand(Commands.NotebookStorage_EditCell, this.commandCallback.bind(undefined, NativeEditorStorage.handleEdit)));
-        disposableRegistry.push(commandManager.registerCommand(Commands.NotebookStorage_InsertCell, this.commandCallback.bind(undefined, NativeEditorStorage.handleInsert)));
-        disposableRegistry.push(commandManager.registerCommand(Commands.NotebookStorage_ModifyCells, this.commandCallback.bind(undefined, NativeEditorStorage.handleModifyCells)));
-        disposableRegistry.push(commandManager.registerCommand(Commands.NotebookStorage_RemoveCell, this.commandCallback.bind(undefined, NativeEditorStorage.handleRemoveCell)));
-        disposableRegistry.push(commandManager.registerCommand(Commands.NotebookStorage_SwapCells, this.commandCallback.bind(undefined, NativeEditorStorage.handleSwapCells)));
-        disposableRegistry.push(
-            commandManager.registerCommand(Commands.NotebookStorage_UpdateVersion, this.commandCallback.bind(undefined, NativeEditorStorage.handleUpdateVersionInfo))
+            commandManager.registerCommand(Commands.NotebookModel_Update, async (resource: Uri, change: NotebookModelChange) => {
+                // Find the appropriate storage object and call into it
+                const storage = await NativeEditorStorage.getStorage(resource);
+                if (storage) {
+                    return storage.handleModelChange(change);
+                }
+            })
         );
     }
 
     private async loadFromFile(file: Uri, possibleContents?: string): Promise<ICell[]> {
         // Save file
-        this.setState({ file });
+        this._state.file = file;
 
         try {
             // Attempt to read the contents if a viable file
@@ -284,13 +332,13 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
             }
         } catch {
             // May not exist at this time. Should always have a single cell though
-            return [this.createEmptyCell()];
+            return [this.createEmptyCell(uuid())];
         }
     }
 
-    private createEmptyCell() {
+    private createEmptyCell(id: string) {
         return {
-            id: uuid(),
+            id,
             line: 0,
             file: Identifiers.EmptyFileName,
             state: CellState.finished,
@@ -333,12 +381,13 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
 
         // Make sure at least one
         if (remapped.length === 0) {
-            remapped.splice(0, 0, this.createEmptyCell());
+            remapped.splice(0, 0, this.createEmptyCell(uuid()));
             forceDirty = true;
         }
 
         // Save as our visible list
-        this.setState({ cells: remapped, isDirty: forceDirty });
+        this._state.cells = remapped;
+        this._state.isDirty = forceDirty;
 
         return this.cells;
     }
@@ -410,41 +459,6 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
             source: splitMultilineString(cell.source)
             // tslint:disable-next-line: no-any
         } as any) as nbformat.ICell; // nyc (code coverage) barfs on this so just trick it.
-    }
-
-    private setState(newState: Partial<INativeEditorStorageState> & { source?: 'vscode' | 'internal' }) {
-        let changed = false;
-        const oldDirty = this.isDirty;
-        const change: INotebookModelChange = { model: this, source: newState.source ? newState.source : 'internal' };
-        if (newState.file) {
-            change.newFile = newState.file;
-            change.oldFile = this.file;
-            this._state.file = change.newFile;
-            NativeEditorStorage.storageMap.delete(this.file.toString());
-            NativeEditorStorage.storageMap.set(newState.file.toString(), this);
-            changed = true;
-        }
-        if (newState.cells) {
-            change.oldCells = this._state.cells;
-            change.newCells = newState.cells;
-            this._state.cells = newState.cells;
-
-            // Force dirty on a cell change
-            change.oldDirty = oldDirty;
-            this._state.isDirty = true;
-            change.newDirty = true;
-            changed = true;
-        }
-        if (newState.isDirty !== undefined && newState.isDirty !== this._state.isDirty) {
-            // This should happen on save all (to put back the dirty cell change)
-            change.newDirty = newState.isDirty;
-            change.oldDirty = oldDirty;
-            this._state.isDirty = newState.isDirty;
-            changed = true;
-        }
-        if (changed) {
-            this._changedEmitter.fire(change);
-        }
     }
 
     private getStorageKey(): string {

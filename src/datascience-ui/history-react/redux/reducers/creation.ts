@@ -86,10 +86,15 @@ export namespace Creation {
 
                 // We're adding a new cell here. Tell the intellisense engine we have a new cell
                 arg.queueAction(
-                    createPostableAction(InteractiveWindowMessages.AddCell, {
+                    createPostableAction(InteractiveWindowMessages.UpdateModel, {
+                        source: 'user',
+                        kind: 'insert',
+                        oldDirty: arg.prevState.dirty,
+                        newDirty: true,
+                        cell: cellVM.cell,
                         fullText: extractInputText(cellVM, result.settings),
                         currentText: cellVM.inputBlockText,
-                        cell: cellVM.cell
+                        index: result.cellVMs.findIndex(c => c.cell.id === arg.payload.id) - 1
                     })
                 );
             }
@@ -130,8 +135,16 @@ export namespace Creation {
         const index = arg.prevState.cellVMs.findIndex(c => c.cell.id === arg.payload.cellId);
         if (index >= 0 && arg.payload.cellId) {
             // Send messages to other side to indicate the delete
-            arg.queueAction(createPostableAction(InteractiveWindowMessages.DeleteCell));
-            arg.queueAction(createPostableAction(InteractiveWindowMessages.RemoveCell, { id: arg.payload.cellId }));
+            arg.queueAction(
+                createPostableAction(InteractiveWindowMessages.UpdateModel, {
+                    source: 'user',
+                    kind: 'remove',
+                    index,
+                    oldDirty: arg.prevState.dirty,
+                    newDirty: true,
+                    cell: arg.prevState.cellVMs[index].cell
+                })
+            );
 
             const newVMs = arg.prevState.cellVMs.filter((_c, i) => i !== index);
             return {

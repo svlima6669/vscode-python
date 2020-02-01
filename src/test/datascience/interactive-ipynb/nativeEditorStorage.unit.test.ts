@@ -22,10 +22,10 @@ import { IFileSystem } from '../../../client/common/platform/types';
 import { IConfigurationService, ICryptoUtils, IDisposable, IExtensionContext } from '../../../client/common/types';
 import { EXTENSION_ROOT_DIR } from '../../../client/constants';
 import { Commands } from '../../../client/datascience/constants';
-import { InteractiveWindowMessages } from '../../../client/datascience/interactive-common/interactiveWindowTypes';
+import { ICellContentChange, InteractiveWindowMessages } from '../../../client/datascience/interactive-common/interactiveWindowTypes';
 import { NativeEditorStorage } from '../../../client/datascience/interactive-ipynb/nativeEditorStorage';
 import { JupyterExecutionFactory } from '../../../client/datascience/jupyter/jupyterExecutionFactory';
-import { IJupyterExecution, INotebookServerOptions } from '../../../client/datascience/types';
+import { ICell, IJupyterExecution, INotebookServerOptions } from '../../../client/datascience/types';
 import { IInterpreterService } from '../../../client/interpreter/contracts';
 import { InterpreterService } from '../../../client/interpreter/interpreterService';
 import { createEmptyCell } from '../../../datascience-ui/interactive-common/mainState';
@@ -345,13 +345,71 @@ suite('Data Science - Native Editor Storage', () => {
         disposables.forEach(d => d.dispose());
     });
 
+    function insertCell(index: number, code: string) {
+        return executeCommand(Commands.NotebookModel_Update, baseUri, {
+            source: 'user',
+            kind: 'insert',
+            oldDirty: storage.isDirty,
+            newDirty: true,
+            cell: createEmptyCell(code, 1),
+            index,
+            fullText: code,
+            currentText: code
+        });
+    }
+
+    function swapCells(first: string, second: string) {
+        return executeCommand(Commands.NotebookModel_Update, baseUri, {
+            source: 'user',
+            kind: 'swap',
+            oldDirty: storage.isDirty,
+            newDirty: true,
+            firstCellId: first,
+            secondCellId: second
+        });
+    }
+
+    function editCell(changes: ICellContentChange[], cell: ICell, newCode: string) {
+        return executeCommand(Commands.NotebookModel_Update, baseUri, {
+            source: 'user',
+            kind: 'edit',
+            oldDirty: storage.isDirty,
+            newDirty: true,
+            changes,
+            cell,
+            newText: newCode
+        });
+    }
+
+    function removeCell(index: number, cell: ICell) {
+        return executeCommand(Commands.NotebookModel_Update, baseUri, {
+            source: 'user',
+            kind: 'remove',
+            oldDirty: storage.isDirty,
+            newDirty: true,
+            index,
+            cell
+        });
+    }
+
+    function deleteAllCells() {
+        return executeCommand(Commands.NotebookModel_Update, baseUri, {
+            source: 'user',
+            kind: 'remove_all',
+            oldDirty: storage.isDirty,
+            newDirty: true,
+            oldCells: storage.cells,
+            newCellId: '1'
+        });
+    }
+
     function executeCommand<E extends keyof ICommandNameArgumentTypeMapping, U extends ICommandNameArgumentTypeMapping[E]>(command: E, ...rest: U) {
         return cmdManager.executeCommand(command, ...rest);
     }
 
     test('Create new editor and add some cells', async () => {
         await storage.load(baseUri);
-        await executeCommand(Commands.NotebookStorage_InsertCell, baseUri, { index: 0, cell: createEmptyCell('1', 1), code: '1', codeCellAboveId: undefined });
+        await insertCell(0, '1');
         const cells = storage.cells;
         expect(cells).to.be.lengthOf(4);
         expect(storage.isDirty).to.be.equal(true, 'Editor should be dirty');
@@ -360,7 +418,7 @@ suite('Data Science - Native Editor Storage', () => {
 
     test('Move cells around', async () => {
         await storage.load(baseUri);
-        await executeCommand(Commands.NotebookStorage_SwapCells, baseUri, { firstCellId: 'NotebookImport#0', secondCellId: 'NotebookImport#1' });
+        await swapCells('NotebookImport#0', 'NotebookImport#1');
         const cells = storage.cells;
         expect(cells).to.be.lengthOf(3);
         expect(storage.isDirty).to.be.equal(true, 'Editor should be dirty');
@@ -370,8 +428,8 @@ suite('Data Science - Native Editor Storage', () => {
     test('Edit/delete cells', async () => {
         await storage.load(baseUri);
         expect(storage.isDirty).to.be.equal(false, 'Editor should not be dirty');
-        await executeCommand(Commands.NotebookStorage_EditCell, baseUri, {
-            changes: [
+        await editCell(
+            [
                 {
                     range: {
                         startLineNumber: 2,
@@ -384,18 +442,19 @@ suite('Data Science - Native Editor Storage', () => {
                     text: 'a'
                 }
             ],
-            id: 'NotebookImport#1'
-        });
+            storage.cells[1],
+            'a'
+        );
         let cells = storage.cells;
         expect(cells).to.be.lengthOf(3);
         expect(cells[1].id).to.be.match(/NotebookImport#1/);
         expect(cells[1].data.source).to.be.equals('b=2\nab');
         expect(storage.isDirty).to.be.equal(true, 'Editor should be dirty');
-        await executeCommand(Commands.NotebookStorage_RemoveCell, baseUri, 'NotebookImport#0');
+        await removeCell(0, cells[0]);
         cells = storage.cells;
         expect(cells).to.be.lengthOf(2);
         expect(cells[0].id).to.be.match(/NotebookImport#1/);
-        await executeCommand(Commands.NotebookStorage_DeleteAllCells, baseUri);
+        await deleteAllCells();
         cells = storage.cells;
         expect(cells).to.be.lengthOf(0);
     });

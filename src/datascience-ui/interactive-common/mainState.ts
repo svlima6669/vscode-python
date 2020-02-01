@@ -59,7 +59,7 @@ export type IMainState = {
     editorOptions?: monacoEditor.editor.IEditorOptions;
     currentExecutionCount: number;
     debugging: boolean;
-    dirty?: boolean;
+    dirty: boolean;
     selectedCellId?: string;
     focusedCellId?: string;
     isAtBottom: boolean;
@@ -132,6 +132,7 @@ export function generateTestState(filePath: string = '', editable: boolean = fal
             size: 14,
             family: "Consolas, 'Courier New', monospace"
         },
+        dirty: false,
         codeTheme: 'Foo',
         settings: defaultSettings,
         activateCount: 0,

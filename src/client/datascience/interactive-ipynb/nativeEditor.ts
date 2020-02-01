@@ -21,17 +21,7 @@ import { IInterpreterService } from '../../interpreter/contracts';
 import { captureTelemetry, sendTelemetryEvent } from '../../telemetry';
 import { Commands, EditorContexts, Identifiers, NativeKeyboardCommandTelemetryLookup, NativeMouseCommandTelemetryLookup, Telemetry } from '../constants';
 import { InteractiveBase } from '../interactive-common/interactiveBase';
-import {
-    IEditCell,
-    IInsertCell,
-    INativeCommand,
-    InteractiveWindowMessages,
-    IRemoveCell,
-    ISaveAll,
-    ISubmitNewCell,
-    ISwapCells,
-    SysInfoReason
-} from '../interactive-common/interactiveWindowTypes';
+import { INativeCommand, InteractiveWindowMessages, ISaveAll, ISubmitNewCell, NotebookModelChange, SysInfoReason } from '../interactive-common/interactiveWindowTypes';
 import { ProgressReporter } from '../progress/progressReporter';
 import {
     CellState,
@@ -49,7 +39,6 @@ import {
     INotebookExporter,
     INotebookImporter,
     INotebookModel,
-    INotebookModelChange,
     INotebookServerOptions,
     IStatusProvider,
     IThemeFinder
@@ -213,24 +202,8 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
                 this.handleMessage(message, payload, this.export);
                 break;
 
-            case InteractiveWindowMessages.EditCell:
-                this.handleMessage(message, payload, this.editCell);
-                break;
-
-            case InteractiveWindowMessages.InsertCell:
-                this.handleMessage(message, payload, this.insertCell);
-                break;
-
-            case InteractiveWindowMessages.RemoveCell:
-                this.handleMessage(message, payload, this.removeCell);
-                break;
-
-            case InteractiveWindowMessages.SwapCells:
-                this.handleMessage(message, payload, this.swapCells);
-                break;
-
-            case InteractiveWindowMessages.DeleteAllCells:
-                this.handleMessage(message, payload, this.removeAllCells);
+            case InteractiveWindowMessages.UpdateModel:
+                this.handleMessage(message, payload, this.updateModel);
                 break;
 
             case InteractiveWindowMessages.NativeCommand:
@@ -240,10 +213,6 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
             // call this to update the whole document for intellisense
             case InteractiveWindowMessages.LoadAllCellsComplete:
                 this.handleMessage(message, payload, this.loadCellsComplete);
-                break;
-
-            case InteractiveWindowMessages.ClearAllOutputs:
-                this.handleMessage(message, payload, this.clearAllOutputs);
                 break;
 
             default:
@@ -274,13 +243,6 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
 
     public addCellBelow() {
         this.postMessage(InteractiveWindowMessages.NotebookAddCellBelow).ignoreErrors();
-    }
-
-    public async removeAllCells(): Promise<void> {
-        super.removeAllCells();
-        // Clear our visible cells in our model too. This should cause an update to the model
-        // that will fire off a changed event
-        this.commandManager.executeCommand(Commands.NotebookStorage_DeleteAllCells, this.file);
     }
 
     protected addSysInfo(_reason: SysInfoReason): Promise<void> {
@@ -349,7 +311,7 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
                     line: 0,
                     state: CellState.error
                 }
-            ]);
+            ]).ignoreErrors();
 
             // Tell the other side we restarted the kernel. This will stop all executions
             this.postMessage(InteractiveWindowMessages.RestartKernel).ignoreErrors();
@@ -374,22 +336,37 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
         }
     }
 
-    protected sendCellsToWebView(cells: ICell[]) {
+    protected async sendCellsToWebView(cells: ICell[]) {
         // Filter out sysinfo messages. Don't want to show those
         const filtered = cells.filter(c => c.data.cell_type !== 'messages');
 
         // Update these cells in our storage only when cells are finished
-        const finished = filtered.filter(c => c.state === CellState.finished || c.state === CellState.error);
-        if (finished.length > 0) {
-            this.commandManager.executeCommand(Commands.NotebookStorage_ModifyCells, this.file, finished);
+        const modified = filtered.filter(c => c.state === CellState.finished || c.state === CellState.error);
+        const unmodified = this._model?.cells.filter(c => modified.find(m => m.id === c.id));
+        if (modified.length > 0 && unmodified && this._model) {
+            await this.commandManager.executeCommand(Commands.NotebookModel_Update, this.file, {
+                source: 'user',
+                kind: 'modify',
+                newCells: modified,
+                oldCells: unmodified,
+                oldDirty: this._model.isDirty,
+                newDirty: true
+            });
         }
 
         // Tell storage about our notebook object
         const notebook = this.getNotebook();
-        if (notebook) {
+        if (notebook && this._model) {
             const interpreter = notebook.getMatchingInterpreter();
             const kernelSpec = notebook.getKernelSpec();
-            this.commandManager.executeCommand(Commands.NotebookStorage_UpdateVersion, this.file, interpreter, kernelSpec);
+            this.commandManager.executeCommand(Commands.NotebookModel_Update, this.file, {
+                source: 'user',
+                kind: 'version',
+                oldDirty: this._model.isDirty,
+                newDirty: this._model.isDirty,
+                interpreter,
+                kernelSpec
+            });
         }
 
         // Send onto the webview.
@@ -431,15 +408,16 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
         // Actually don't close, just let the error bubble out
     }
 
-    private async modelChanged(change: INotebookModelChange) {
-        if (change.source === 'vscode' && change.newCells !== undefined) {
-            // VS code is telling us to broadcast this to our UI. Tell the UI to reload the cells
-            await this.postMessage(InteractiveWindowMessages.LoadAllCells, { cells: change.newCells });
+    private async modelChanged(change: NotebookModelChange) {
+        if (change.source !== 'user') {
+            // VS code is telling us to broadcast this to our UI. Tell the UI about the new change
+            await this.postMessage(InteractiveWindowMessages.UpdateModel, change);
         }
 
-        if (change.newDirty !== undefined) {
+        // Use the current state of the model to indicate dirty (not the message itself)
+        if (this._model && change.newDirty !== change.oldDirty) {
             this.modifiedEvent.fire();
-            if (change.newDirty) {
+            if (this._model.isDirty) {
                 await this.postMessage(InteractiveWindowMessages.NotebookDirty);
             } else {
                 // Going clean should only happen on a save (for now. Undo might do this too)
@@ -448,6 +426,13 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
                 // Then tell the UI
                 await this.postMessage(InteractiveWindowMessages.NotebookClean);
             }
+        }
+    }
+
+    private updateModel(change: NotebookModelChange) {
+        // Send to our model using a command. User has done something that changes the model
+        if (change.source === 'user' && this._model) {
+            this.commandManager.executeCommand(Commands.NotebookModel_Update, this.file, change);
         }
     }
 
@@ -471,23 +456,6 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
         if (oldAsk && settings && settings.datascience) {
             settings.datascience.askForKernelRestart = true;
         }
-    }
-
-    private async editCell(request: IEditCell) {
-        this.commandManager.executeCommand(Commands.NotebookStorage_EditCell, this.file, request);
-    }
-
-    private async insertCell(request: IInsertCell): Promise<void> {
-        this.commandManager.executeCommand(Commands.NotebookStorage_InsertCell, this.file, request);
-    }
-
-    private async removeCell(request: IRemoveCell): Promise<void> {
-        this.commandManager.executeCommand(Commands.NotebookStorage_RemoveCell, this.file, request.id);
-    }
-
-    private async swapCells(request: ISwapCells): Promise<void> {
-        // Swap two cells in our list
-        this.commandManager.executeCommand(Commands.NotebookStorage_SwapCells, this.file, request);
     }
 
     @captureTelemetry(Telemetry.ConvertToPythonFile, undefined, false)
@@ -541,9 +509,5 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
             this.loadedAllCells = true;
             sendTelemetryEvent(Telemetry.NotebookOpenTime, this.startupTimer.elapsedTime);
         }
-    }
-
-    private async clearAllOutputs() {
-        this.commandManager.executeCommand(Commands.NotebookStorage_ClearCellOutputs, this.file);
     }
 }

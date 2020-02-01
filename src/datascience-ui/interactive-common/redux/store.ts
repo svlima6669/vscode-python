@@ -35,6 +35,7 @@ function generateDefaultState(skipDefault: boolean, testMode: boolean, baseTheme
             currentExecutionCount: 0,
             debugging: false,
             knownDark: false,
+            dirty: false,
             editCellVM: editable ? undefined : createEditableCellVM(0),
             isAtBottom: true,
             font: {

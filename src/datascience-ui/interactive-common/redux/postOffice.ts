@@ -58,11 +58,6 @@ export enum IncomingMessageActions {
     RESOLVECOMPLETIONITEMREQUEST = 'action.resolve_completion_item_request',
     CANCELRESOLVECOMPLETIONITEMREQUEST = 'action.cancel_completion_items_request',
     RESOLVECOMPLETIONITEMRESPONSE = 'action.resolve_completion_item_response',
-    ADDCELL = 'action.add_cell',
-    EDITCELL = 'action.edit_cell',
-    REMOVECELL = 'action.remove_cell',
-    SWAPCELLS = 'action.swap_cells',
-    INSERTCELL = 'action.insert_cell',
     LOADONIGASMASSEMBLYREQUEST = 'action.load_onigasm_assembly_request',
     LOADONIGASMASSEMBLYRESPONSE = 'action.load_onigasm_assembly_response',
     LOADTMLANGUAGEREQUEST = 'action.load_tmlanguage_request',
@@ -93,7 +88,8 @@ export enum IncomingMessageActions {
     GETMONACOTHEMEREQUEST = 'action.get_monaco_theme_request',
     GETMONACOTHEMERESPONSE = 'action.get_monaco_theme_response',
     UPDATEKERNEL = 'action.update_kernel',
-    LOCINIT = 'action.loc_init'
+    LOCINIT = 'action.loc_init',
+    UPDATEMODEL = 'action.update_model'
 }
 
 export const AllowedMessages = [...Object.values(InteractiveWindowMessages), ...Object.values(CssMessages), ...Object.values(SharedMessages)];

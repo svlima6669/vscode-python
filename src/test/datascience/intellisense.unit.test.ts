@@ -4,6 +4,7 @@
 import { expect } from 'chai';
 import * as monacoEditor from 'monaco-editor/esm/vs/editor/editor.api';
 import * as TypeMoq from 'typemoq';
+import * as uuid from 'uuid/v4';
 
 import { IWorkspaceService } from '../../client/common/application/types';
 import { PythonSettings } from '../../client/common/configSettings';
@@ -43,6 +44,7 @@ suite('DataScience Intellisense Unit Tests', () => {
     let fileSystem: TypeMoq.IMock<IFileSystem>;
     let jupyterExecution: TypeMoq.IMock<IJupyterExecution>;
     let interactiveWindowProvider: TypeMoq.IMock<IInteractiveWindowProvider>;
+    let cells: ICell[] = [createEmptyCell(Identifiers.EditCellId, null)];
     const pythonSettings = new (class extends PythonSettings {
         public fireChangeEvent() {
             this.changed.fire();
@@ -79,7 +81,20 @@ suite('DataScience Intellisense Unit Tests', () => {
     }
 
     function addCell(code: string, id: string): Promise<void> {
-        return sendMessage(InteractiveWindowMessages.AddCell, { fullText: code, currentText: code, cell: createEmptyCell(id, null) });
+        const cell = createEmptyCell(id, null);
+        cell.data.source = code;
+        const result = sendMessage(InteractiveWindowMessages.UpdateModel, {
+            source: 'user',
+            kind: 'insert',
+            oldDirty: false,
+            newDirty: true,
+            fullText: code,
+            currentText: code,
+            index: cells.length - 1,
+            cell
+        });
+        cells.splice(cells.length - 1, 0, cell);
+        return result;
     }
 
     function updateCell(newCode: string, oldCode: string, id: string): Promise<void> {
@@ -95,7 +110,15 @@ suite('DataScience Intellisense Unit Tests', () => {
             rangeLength: oldCode.length,
             text: newCode
         };
-        return sendMessage(InteractiveWindowMessages.EditCell, { changes: [change], id });
+        return sendMessage(InteractiveWindowMessages.UpdateModel, {
+            source: 'user',
+            kind: 'edit',
+            oldDirty: false,
+            newDirty: true,
+            changes: [change],
+            cell: cells.find(c => c.id === id)!,
+            newText: newCode
+        });
     }
 
     function addCode(code: string, line: number, pos: number, offset: number): Promise<void> {
@@ -113,7 +136,15 @@ suite('DataScience Intellisense Unit Tests', () => {
             rangeLength: 0,
             text: code
         };
-        return sendMessage(InteractiveWindowMessages.EditCell, { changes: [change], id: Identifiers.EditCellId });
+        return sendMessage(InteractiveWindowMessages.UpdateModel, {
+            source: 'user',
+            kind: 'edit',
+            oldDirty: false,
+            newDirty: true,
+            changes: [change],
+            cell: cells[cells.length - 1],
+            newText: code
+        });
     }
 
     function removeCode(line: number, startPos: number, endPos: number, length: number): Promise<void> {
@@ -131,26 +162,69 @@ suite('DataScience Intellisense Unit Tests', () => {
             rangeLength: length,
             text: ''
         };
-        return sendMessage(InteractiveWindowMessages.EditCell, { changes: [change], id: Identifiers.EditCellId });
+        return sendMessage(InteractiveWindowMessages.UpdateModel, {
+            source: 'user',
+            kind: 'edit',
+            oldDirty: false,
+            newDirty: true,
+            changes: [change],
+            cell: cells[cells.length - 1],
+            newText: ''
+        });
     }
 
     function removeCell(id: string): Promise<void> {
-        return sendMessage(InteractiveWindowMessages.RemoveCell, { id });
+        return sendMessage(InteractiveWindowMessages.UpdateModel, {
+            source: 'user',
+            kind: 'remove',
+            oldDirty: false,
+            newDirty: true,
+            cell: cells.find(c => c.id === id)!,
+            index: cells.findIndex(c => c.id === id)
+        });
     }
 
     function removeAllCells(): Promise<void> {
-        return sendMessage(InteractiveWindowMessages.DeleteAllCells);
+        return sendMessage(InteractiveWindowMessages.UpdateModel, {
+            source: 'user',
+            kind: 'remove_all',
+            oldDirty: false,
+            newDirty: true,
+            oldCells: cells,
+            newCellId: uuid()
+        });
     }
 
     function swapCells(id1: string, id2: string): Promise<void> {
-        return sendMessage(InteractiveWindowMessages.SwapCells, { firstCellId: id1, secondCellId: id2 });
+        return sendMessage(InteractiveWindowMessages.UpdateModel, {
+            source: 'user',
+            kind: 'swap',
+            oldDirty: false,
+            newDirty: true,
+            firstCellId: id1,
+            secondCellId: id2
+        });
     }
 
     function insertCell(id: string, code: string, codeCellAbove?: string): Promise<void> {
-        return sendMessage(InteractiveWindowMessages.InsertCell, { cell: createEmptyCell(id, null), index: 0, code, codeCellAboveId: codeCellAbove });
+        const cell = createEmptyCell(id, null);
+        cell.data.source = code;
+        const index = codeCellAbove ? cells.findIndex(c => c.id === codeCellAbove) : 0;
+        return sendMessage(InteractiveWindowMessages.UpdateModel, {
+            source: 'user',
+            kind: 'insert',
+            oldDirty: false,
+            newDirty: true,
+            codeCellAboveId: codeCellAbove,
+            cell,
+            index,
+            fullText: code,
+            currentText: code
+        });
     }
 
-    function loadAllCells(cells: ICell[]): Promise<void> {
+    function loadAllCells(allCells: ICell[]): Promise<void> {
+        cells = allCells;
         return sendMessage(InteractiveWindowMessages.LoadAllCellsComplete, { cells });
     }
 
@@ -306,8 +380,8 @@ suite('DataScience Intellisense Unit Tests', () => {
     });
 
     test('Load remove and insert', async () => {
-        const cells = generateTestCells('foo.py', 1);
-        await loadAllCells(cells);
+        const test = generateTestCells('foo.py', 1);
+        await loadAllCells(test);
         expect(getDocumentContents()).to.be.eq(TestCellContents, 'Load all cells is failing');
         await removeAllCells();
         expect(getDocumentContents()).to.be.eq('', 'Remove all cells is failing');
@@ -318,8 +392,8 @@ suite('DataScience Intellisense Unit Tests', () => {
     });
 
     test('Swap cells around', async () => {
-        const cells = generateTestCells('foo.py', 1);
-        await loadAllCells(cells);
+        const test = generateTestCells('foo.py', 1);
+        await loadAllCells(test);
         await swapCells('0', '1'); // 2nd cell is markdown
         expect(getDocumentContents()).to.be.eq(TestCellContents, 'Swap cells should skip swapping on markdown');
         await swapCells('0', '2');
@@ -342,8 +416,8 @@ df
     });
 
     test('Insert and swap', async () => {
-        const cells = generateTestCells('foo.py', 1);
-        await loadAllCells(cells);
+        const test = generateTestCells('foo.py', 1);
+        await loadAllCells(test);
         expect(getDocumentContents()).to.be.eq(TestCellContents, 'Load all cells is failing');
         await insertCell('6', 'foo');
         const afterInsert = `foo

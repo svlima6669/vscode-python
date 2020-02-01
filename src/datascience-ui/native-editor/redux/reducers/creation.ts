@@ -3,14 +3,17 @@
 'use strict';
 import * as uuid from 'uuid/v4';
 
-import { ILoadAllCells, InteractiveWindowMessages } from '../../../../client/datascience/interactive-common/interactiveWindowTypes';
+import { noop } from '../../../../client/common/utils/misc';
+import { ILoadAllCells, NotebookModelChange } from '../../../../client/datascience/interactive-common/interactiveWindowTypes';
 import { ICell, IDataScienceExtraSettings } from '../../../../client/datascience/types';
 import { createCellVM, createEmptyCell, CursorPos, extractInputText, ICellViewModel, IMainState } from '../../../interactive-common/mainState';
-import { createPostableAction } from '../../../interactive-common/redux/postOffice';
 import { Helpers } from '../../../interactive-common/redux/reducers/helpers';
+import { Transfer } from '../../../interactive-common/redux/reducers/transfer';
 import { IAddCellAction, ICellAction } from '../../../interactive-common/redux/reducers/types';
 import { actionCreators } from '../actions';
 import { NativeEditorReducerArg } from '../mapping';
+import { Execution } from './execution';
+import { Movement } from './movement';
 
 export namespace Creation {
     function prepareCellVM(cell: ICell, hasBeenRun: boolean, settings?: IDataScienceExtraSettings): ICellViewModel {
@@ -57,9 +60,7 @@ export namespace Creation {
         };
 
         // Send a messsage that we inserted a cell
-        arg.queueAction(
-            createPostableAction(InteractiveWindowMessages.InsertCell, { cell: newVM.cell, index: position, code: '', codeCellAboveId: findFirstCodeCellAbove(newList, position) })
-        );
+        Transfer.postModelInsert(arg, position, newVM.cell, findFirstCodeCellAbove(newList, position));
 
         // Queue up an action to set focus to the cell we're inserting
         setTimeout(() => {
@@ -92,9 +93,7 @@ export namespace Creation {
         };
 
         // Send a messsage that we inserted a cell
-        arg.queueAction(
-            createPostableAction(InteractiveWindowMessages.InsertCell, { cell: newVM.cell, index, code: '', codeCellAboveId: findFirstCodeCellAbove(newList, position) })
-        );
+        Transfer.postModelInsert(arg, -1, newVM.cell, findFirstCodeCellAbove(newList, position));
 
         // Queue up an action to set focus to the cell we're inserting
         setTimeout(() => {
@@ -130,9 +129,6 @@ export namespace Creation {
     }
 
     export function deleteAllCells(arg: NativeEditorReducerArg<IAddCellAction>): IMainState {
-        // Send messages to other side to indicate the deletes
-        arg.queueAction(createPostableAction(InteractiveWindowMessages.DeleteAllCells));
-
         // Just leave one single blank empty cell
         const newVM: ICellViewModel = {
             cell: createEmptyCell(arg.payload.newCellId, null),
@@ -148,7 +144,7 @@ export namespace Creation {
             scrollCount: 0
         };
 
-        arg.queueAction(createPostableAction(InteractiveWindowMessages.InsertCell, { cell: newVM.cell, code: '', index: 0, codeCellAboveId: undefined }));
+        Transfer.postModelRemoveAll(arg, newVM.cell.id);
 
         return {
             ...arg.prevState,
@@ -178,9 +174,8 @@ export namespace Creation {
             };
 
             // Send messages to other side to indicate the new add
-            arg.queueAction(createPostableAction(InteractiveWindowMessages.DeleteCell));
-            arg.queueAction(createPostableAction(InteractiveWindowMessages.RemoveCell, { id: arg.payload.cellId }));
-            arg.queueAction(createPostableAction(InteractiveWindowMessages.InsertCell, { cell: newVM.cell, code: '', index: 0, codeCellAboveId: undefined }));
+            Transfer.postModelRemove(arg, 0, cells[0].cell);
+            Transfer.postModelInsert(arg, 0, newVM.cell);
 
             return {
                 ...arg.prevState,
@@ -191,8 +186,7 @@ export namespace Creation {
             // Otherwise just a straight delete
             const index = arg.prevState.cellVMs.findIndex(c => c.cell.id === arg.payload.cellId);
             if (index >= 0) {
-                arg.queueAction(createPostableAction(InteractiveWindowMessages.DeleteCell));
-                arg.queueAction(createPostableAction(InteractiveWindowMessages.RemoveCell, { id: arg.payload.cellId }));
+                Transfer.postModelRemove(arg, 0, cells[index].cell);
 
                 // Recompute select/focus if this item has either
                 let newSelection = arg.prevState.selectedCellId;
@@ -240,5 +234,68 @@ export namespace Creation {
             undoStack: [],
             redoStack: []
         };
+    }
+
+    function handleUndoModel(arg: NativeEditorReducerArg<NotebookModelChange>): IMainState {
+        // Disable the queueAction in the arg so that calling other reducers doesn't cause
+        // messages to be posted back (as were handling a message from the extension here)
+        const disabledQueueArg = { ...arg, queueAction: noop };
+        switch (arg.payload.kind) {
+            case 'clear':
+                return loadAllCells({ ...disabledQueueArg, payload: { cells: arg.payload.oldCells } });
+            case 'edit':
+                return updateCell({ ...disabledQueueArg, payload: arg.payload.cell });
+            case 'insert':
+                return deleteCell({ ...disabledQueueArg, payload: { cellId: arg.payload.cell.id } });
+            case 'remove':
+                const cellBelow = arg.prevState.cellVMs.length > arg.payload.index ? arg.prevState.cellVMs[arg.payload.index].cell : undefined;
+                return insertAbove({ ...disabledQueueArg, payload: { newCellId: arg.payload.cell.id, cellId: cellBelow ? cellBelow.id : undefined } });
+            case 'remove_all':
+                return loadAllCells({ ...disabledQueueArg, payload: { cells: arg.payload.oldCells } });
+            case 'swap':
+                return Movement.swapCells({ ...disabledQueueArg, payload: { firstCellId: arg.payload.secondCellId, secondCellId: arg.payload.firstCellId } });
+            default:
+                // Modify, file, version can all be ignored.
+                break;
+        }
+
+        return arg.prevState;
+    }
+
+    function handleRedoModel(arg: NativeEditorReducerArg<NotebookModelChange>): IMainState {
+        // Disable the queueAction in the arg so that calling other reducers doesn't cause
+        // messages to be posted back (as were handling a message from the extension here)
+        const disabledQueueArg = { ...arg, queueAction: noop };
+        switch (arg.payload.kind) {
+            case 'clear':
+                return Execution.clearAllOutputs(disabledQueueArg);
+            case 'edit':
+                return updateCell({ ...disabledQueueArg, payload: Helpers.asCell({ ...arg.payload.cell, data: { ...arg.payload.cell.data, source: arg.payload.newText } }) });
+            case 'insert':
+                return insertAbove({ ...disabledQueueArg, payload: { newCellId: arg.payload.cell.id, cellId: arg.payload.codeCellAboveId } });
+            case 'remove':
+                return deleteCell({ ...disabledQueueArg, payload: { cellId: arg.payload.cell.id } });
+            case 'remove_all':
+                return deleteAllCells({ ...disabledQueueArg, payload: { newCellId: arg.payload.newCellId } });
+            case 'swap':
+                return Movement.swapCells({ ...disabledQueueArg, payload: { firstCellId: arg.payload.secondCellId, secondCellId: arg.payload.firstCellId } });
+            default:
+                // Modify, file, version can all be ignored.
+                break;
+        }
+
+        return arg.prevState;
+    }
+
+    export function handleUpdate(arg: NativeEditorReducerArg<NotebookModelChange>): IMainState {
+        switch (arg.payload.source) {
+            case 'undo':
+                return handleUndoModel(arg);
+            case 'redo':
+                return handleRedoModel(arg);
+            default:
+                break;
+        }
+        return arg.prevState;
     }
 }
