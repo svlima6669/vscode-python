@@ -1,8 +1,10 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 'use strict';
+import { ConfigurationTarget } from 'vscode';
 import { IExtensionSingleActivationService } from '../activation/types';
 import { IWorkspaceService } from '../common/application/types';
+import { noop } from '../common/utils/misc';
 import { IServiceManager } from '../ioc/types';
 import { Activation } from './activation';
 import { CodeCssGenerator } from './codeCssGenerator';
@@ -180,13 +182,28 @@ export function registerTypes(serviceManager: IServiceManager) {
         serviceManager.addSingleton<IJupyterInterpreterDependencyManager>(IJupyterInterpreterDependencyManager, JupyterInterpreterSubCommandExecutionService);
     }
 
-    const gatherEnabled: boolean = false; //serviceManager.get<IConfigurationService>('python.dataScience', undefined).getSettings().datascience.enableGather ? true : false;
-    if (gatherEnabled) {
-        // tslint:disable-next-line: no-require-imports
-        const gather = require('./gather/gather');
-
-        serviceManager.add<IGatherProvider>(IGatherProvider, gather.GatherProvider);
-        serviceManager.add<IGatherLogger>(IGatherLogger, GatherLogger);
-        serviceManager.addBinding(IGatherLogger, INotebookExecutionLogger);
+    if (cfg.get<boolean>('enableGather', false)) {
+        try {
+            registerGatherTypes(serviceManager);
+        } catch (ex) {
+            cfg.update('enableGather', false, ConfigurationTarget.Global).then(() => {
+                noop();
+            });
+            cfg.update('enableGather', false, ConfigurationTarget.Workspace).then(() => {
+                noop();
+            });
+            cfg.update('enableGather', false, ConfigurationTarget.WorkspaceFolder).then(() => {
+                noop();
+            });
+        }
     }
+}
+
+export function registerGatherTypes(serviceManager: IServiceManager) {
+    // tslint:disable-next-line: no-require-imports
+    const gather = require('./gather/gather');
+
+    serviceManager.add<IGatherProvider>(IGatherProvider, gather.GatherProvider);
+    serviceManager.add<IGatherLogger>(IGatherLogger, GatherLogger);
+    serviceManager.addBinding(IGatherLogger, INotebookExecutionLogger);
 }
