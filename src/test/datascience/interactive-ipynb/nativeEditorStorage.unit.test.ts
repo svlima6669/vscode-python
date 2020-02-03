@@ -377,7 +377,9 @@ suite('Data Science - Native Editor Storage', () => {
             newDirty: true,
             changes,
             cell,
-            newText: newCode
+            newText: newCode,
+            isUndo: false,
+            isRedo: false
         });
     }
 

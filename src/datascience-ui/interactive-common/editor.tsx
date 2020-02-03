@@ -28,7 +28,7 @@ export interface IEditorProps {
     hasFocus: boolean;
     cursorPos: CursorPos;
     onCreated(code: string, modelId: string): void;
-    onChange(changes: monacoEditor.editor.IModelContentChange[], model: monacoEditor.editor.ITextModel): void;
+    onChange(changes: monacoEditor.editor.IModelContentChange[], isUndo: boolean, isRedo: boolean, model: monacoEditor.editor.ITextModel): void;
     openLink(uri: monacoEditor.Uri): void;
     keyDown?(e: IKeyboardEvent): void;
     focused?(): void;
@@ -184,7 +184,7 @@ export class Editor extends React.Component<IEditorProps, IEditorState> {
 
     private modelChanged = (e: monacoEditor.editor.IModelContentChangedEvent) => {
         if (this.state.model) {
-            this.props.onChange(e.changes, this.state.model);
+            this.props.onChange(e.changes, e.isUndoing, e.isRedoing, this.state.model);
         }
     };
 

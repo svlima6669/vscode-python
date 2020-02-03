@@ -280,6 +280,7 @@ export class NativeCell extends React.Component<INativeCellProps> {
                     this.props.sendCommand(NativeCommandType.ToggleOutput, 'keyboard');
                 }
                 break;
+            case 'NumpadEnter':
             case 'Enter':
                 if (e.shiftKey) {
                     this.shiftEnterCell(e);
@@ -325,6 +326,16 @@ export class NativeCell extends React.Component<INativeCellProps> {
                         this.props.undo();
                         this.props.sendCommand(NativeCommandType.Undo, 'keyboard');
                     }
+                }
+                break;
+            case 'KeyZ':
+                if (e.ctrlKey) {
+                    window.console.log('Undoing');
+                }
+                break;
+            case 'KeyY':
+                if (e.ctrlKey) {
+                    window.console.log('Redoing');
                 }
                 break;
 
@@ -613,8 +624,8 @@ export class NativeCell extends React.Component<INativeCellProps> {
         this.props.unfocusCell(this.cellId, this.getCurrentCode());
     };
 
-    private onCodeChange = (changes: monacoEditor.editor.IModelContentChange[], cellId: string, modelId: string) => {
-        this.props.editCell(cellId, changes, modelId, this.getCurrentCode());
+    private onCodeChange = (changes: monacoEditor.editor.IModelContentChange[], cellId: string, modelId: string, isUndo: boolean, isRedo: boolean) => {
+        this.props.editCell(cellId, changes, modelId, this.getCurrentCode(), isUndo, isRedo);
     };
 
     private onCodeCreated = (_code: string, _file: string, cellId: string, modelId: string) => {

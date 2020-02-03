@@ -95,7 +95,7 @@ export namespace Transfer {
         arg.queueAction(createPostableAction(InteractiveWindowMessages.UpdateModel, update));
     }
 
-    export function postModelEdit<T>(arg: CommonReducerArg<T>, changes: ICellContentChange[], cell: ICell, newText: string) {
+    export function postModelEdit<T>(arg: CommonReducerArg<T>, changes: ICellContentChange[], cell: ICell, newText: string, isUndo: boolean, isRedo: boolean) {
         postModelUpdate(arg, {
             source: 'user',
             kind: 'edit',
@@ -103,7 +103,9 @@ export namespace Transfer {
             oldDirty: arg.prevState.dirty,
             changes,
             cell,
-            newText
+            newText,
+            isUndo,
+            isRedo
         });
     }
 
@@ -172,7 +174,7 @@ export namespace Transfer {
         const cellVM = arg.prevState.cellVMs.find(c => c.cell.id === arg.payload.cellId);
         if (cellVM) {
             // Tell the underlying model on the extension side
-            postModelEdit(arg, arg.payload.changes, cellVM.cell, arg.payload.code);
+            postModelEdit(arg, arg.payload.changes, cellVM.cell, arg.payload.code, arg.payload.isUndo, arg.payload.isRedo);
 
             // Update the uncomitted text on the cell view model
             // We keep this saved here so we don't re-render and we put this code into the input / code data

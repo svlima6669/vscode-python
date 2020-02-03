@@ -22,7 +22,7 @@ export interface IMarkdownProps {
     hasFocus: boolean;
     cursorPos: CursorPos;
     onCreated(code: string, modelId: string): void;
-    onChange(changes: monacoEditor.editor.IModelContentChange[], modelId: string): void;
+    onChange(changes: monacoEditor.editor.IModelContentChange[], modelId: string, isUndo: boolean, isRedo: boolean): void;
     focused?(): void;
     unfocused?(): void;
     openLink(uri: monacoEditor.Uri): void;
@@ -75,7 +75,7 @@ export class Markdown extends React.Component<IMarkdownProps> {
         }
     }
 
-    private onModelChanged = (changes: monacoEditor.editor.IModelContentChange[], model: monacoEditor.editor.ITextModel) => {
-        this.props.onChange(changes, model.id);
+    private onModelChanged = (changes: monacoEditor.editor.IModelContentChange[], isUndo: boolean, isRedo: boolean, model: monacoEditor.editor.ITextModel) => {
+        this.props.onChange(changes, model.id, isUndo, isRedo);
     };
 }

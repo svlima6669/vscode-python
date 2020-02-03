@@ -12,7 +12,7 @@ import { GLOBAL_MEMENTO, ICryptoUtils, IDisposable, IDisposableRegistry, IExtens
 import { noop } from '../../common/utils/misc';
 import { PythonInterpreter } from '../../interpreter/contracts';
 import { Commands, Identifiers } from '../constants';
-import { ICellContentChange, NotebookModelChange } from '../interactive-common/interactiveWindowTypes';
+import { INotebookModelEditChange, NotebookModelChange } from '../interactive-common/interactiveWindowTypes';
 import { InvalidNotebookFileError } from '../jupyter/invalidNotebookFileError';
 import { LiveKernelModel } from '../jupyter/kernels/types';
 import { CellState, ICell, IJupyterExecution, IJupyterKernelSpec, INotebookModel, INotebookStorage } from '../types';
@@ -121,45 +121,49 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
 
     private handleModelChange(change: NotebookModelChange) {
         const oldDirty = this.isDirty;
+        let changed = false;
 
         switch (change.source) {
             case 'redo':
             case 'user':
-                this.handleRedo(change);
+                changed = this.handleRedo(change);
                 break;
             case 'undo':
-                this.handleUndo(change);
+                changed = this.handleUndo(change);
                 break;
             default:
                 break;
         }
 
-        // Forward onto our listeners (modifying dirty)
-        this._changedEmitter.fire({ ...change, newDirty: this.isDirty, oldDirty });
+        // Forward onto our listeners if necessary
+        if (changed) {
+            this._changedEmitter.fire({ ...change, newDirty: this.isDirty, oldDirty });
+        }
     }
 
-    private handleRedo(change: NotebookModelChange) {
+    private handleRedo(change: NotebookModelChange): boolean {
+        let changed = false;
         switch (change.kind) {
             case 'clear':
-                this.clearOutputs();
+                changed = this.clearOutputs();
                 break;
             case 'edit':
-                this.editCell(change.changes, change.cell.id);
+                changed = this.editCell(change);
                 break;
             case 'insert':
-                this.insertCell(change.cell, change.index);
+                changed = this.insertCell(change.cell, change.index);
                 break;
             case 'modify':
-                this.updateCellState(change.newCells);
+                changed = this.modifyCells(change.newCells);
                 break;
             case 'remove':
-                this.removeCell(change.cell);
+                changed = this.removeCell(change.cell);
                 break;
             case 'remove_all':
-                this.removeAllCells(change.newCellId);
+                changed = this.removeAllCells(change.newCellId);
                 break;
             case 'swap':
-                this.swapCells(change.firstCellId, change.secondCellId);
+                changed = this.swapCells(change.firstCellId, change.secondCellId);
                 break;
             case 'version':
                 this.updateVersionInfo(change.interpreter, change.kernelSpec);
@@ -168,35 +172,42 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
                 this._state.file = change.newFile;
                 NativeEditorStorage.storageMap.delete(change.oldFile.toString());
                 NativeEditorStorage.storageMap.set(change.newFile.toString(), this);
+                changed = change.oldFile.toString() !== change.newFile.toString();
                 break;
             default:
                 break;
         }
-        this._state.isDirty = change.kind !== 'version';
+        if (changed) {
+            this._state.isDirty = true;
+        }
+        return changed;
     }
 
-    private handleUndo(change: NotebookModelChange) {
+    private handleUndo(change: NotebookModelChange): boolean {
+        let changed = false;
         switch (change.kind) {
             case 'clear':
                 this._state.cells = change.oldCells;
+                changed = true;
                 break;
             case 'edit':
-                this.replaceCell(change.cell);
+                changed = this.replaceCell(change.cell);
                 break;
             case 'insert':
-                this.removeCell(change.cell);
+                changed = this.removeCell(change.cell);
                 break;
             case 'modify':
-                this.updateCellState(change.oldCells);
+                changed = this.modifyCells(change.oldCells);
                 break;
             case 'remove':
-                this.insertCell(change.cell, change.index);
+                changed = this.insertCell(change.cell, change.index);
                 break;
             case 'remove_all':
                 this._state.cells = change.oldCells;
+                changed = true;
                 break;
             case 'swap':
-                this.swapCells(change.firstCellId, change.secondCellId);
+                changed = this.swapCells(change.firstCellId, change.secondCellId);
                 break;
             case 'version':
                 // Not supporting undo
@@ -207,34 +218,39 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
 
         // Dirty state comes from undo
         this._state.isDirty = change.oldDirty;
+        return changed;
     }
 
     private removeAllCells(newCellId: string) {
         this._state.cells = [];
         this._state.cells.push(this.createEmptyCell(newCellId));
+        return true;
     }
 
-    private editCell(changes: ICellContentChange[], id: string) {
+    private editCell(change: INotebookModelEditChange): boolean {
         // Apply the changes to the visible cell list. We won't get an update until
         // submission otherwise
-        if (changes && changes.length) {
-            const change = changes[0];
-            const normalized = change.text.replace(/\r/g, '');
+        if (change.changes && change.changes.length) {
+            const first = change.changes[0];
+            const normalized = first.text.replace(/\r/g, '');
 
             // Figure out which cell we're editing.
-            const index = this.cells.findIndex(c => c.id === id);
+            const index = this.cells.findIndex(c => c.id === change.cell.id);
             if (index >= 0) {
                 // This is an actual edit.
                 const contents = concatMultilineStringInput(this.cells[index].data.source);
-                const before = contents.substr(0, change.rangeOffset);
-                const after = contents.substr(change.rangeOffset + change.rangeLength);
+                const before = contents.substr(0, first.rangeOffset);
+                const after = contents.substr(first.rangeOffset + first.rangeLength);
                 const newContents = `${before}${normalized}${after}`;
                 if (contents !== newContents) {
                     const newCell = { ...this.cells[index], data: { ...this.cells[index].data, source: newContents } };
                     this._state.cells[index] = this.asCell(newCell);
+                    return true;
                 }
             }
         }
+
+        return false;
     }
 
     private swapCells(firstCellId: string, secondCellId: string) {
@@ -244,35 +260,43 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
             const temp = { ...this.cells[first] };
             this._state.cells[first] = this.asCell(this.cells[second]);
             this._state.cells[second] = this.asCell(temp);
+            return true;
         }
+        return false;
     }
 
-    private updateCellState(cells: ICell[]) {
+    private modifyCells(cells: ICell[]): boolean {
         // Update these cells in our list
         cells.forEach(c => {
             const index = this.cells.findIndex(v => v.id === c.id);
             this._state.cells[index] = this.asCell(c);
         });
+        return true;
     }
 
-    private removeCell(cell: ICell) {
+    private removeCell(cell: ICell): boolean {
         this._state.cells = this.cells.filter(c => c.id !== cell.id);
+        return true;
     }
 
-    private replaceCell(cell: ICell) {
+    private replaceCell(cell: ICell): boolean {
         const index = this.cells.findIndex(c => c.id === cell.id);
         if (index >= 0) {
             this._state.cells[index] = cell;
+            return true;
         }
+        return false;
     }
 
-    private clearOutputs() {
+    private clearOutputs(): boolean {
         this._state.cells = this.cells.map(c => this.asCell({ ...c, data: { ...c.data, execution_count: null, outputs: [] } }));
+        return true;
     }
 
-    private insertCell(cell: ICell, index: number) {
+    private insertCell(cell: ICell, index: number): boolean {
         // Insert a cell into our visible list based on the index. They should be in sync
         this._state.cells.splice(index, 0, cell);
+        return true;
     }
 
     private updateVersionInfo(interpreter: PythonInterpreter | undefined, kernelSpec: IJupyterKernelSpec | LiveKernelModel | undefined) {

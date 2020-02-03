@@ -76,14 +76,11 @@ export namespace Creation {
 
         // Find the position where we want to insert
         let position = arg.prevState.cellVMs.findIndex(c => c.cell.id === arg.payload.cellId);
-        let index = 0;
         if (position >= 0) {
             newList.splice(position + 1, 0, newVM);
-            index = position + 1;
         } else {
             newList.push(newVM);
             position = newList.length - 2;
-            index = newList.length - 1;
         }
 
         const result = {

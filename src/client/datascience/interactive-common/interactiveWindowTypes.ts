@@ -377,6 +377,8 @@ export interface INotebookModelEditChange extends INotebookModelChange {
     changes: ICellContentChange[];
     newText: string;
     cell: ICell;
+    isUndo: boolean;
+    isRedo: boolean;
 }
 
 export interface INotebookModelVersionChange extends INotebookModelChange {

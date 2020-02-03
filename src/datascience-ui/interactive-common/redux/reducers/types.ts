@@ -109,6 +109,8 @@ export interface ICodeAction extends ICellAction {
 export interface IEditCellAction extends ICodeAction {
     changes: monacoEditor.editor.IModelContentChange[];
     modelId: string;
+    isUndo: boolean;
+    isRedo: boolean;
 }
 
 // I.e. when using the operation `add`, we need the corresponding `IAddCellAction`.

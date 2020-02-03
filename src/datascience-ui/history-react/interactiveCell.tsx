@@ -286,8 +286,8 @@ export class InteractiveCell extends React.Component<IInteractiveCellProps> {
         return contents || concatMultilineStringInput(this.props.cellVM.cell.data.source);
     }
 
-    private onCodeChange = (changes: monacoEditor.editor.IModelContentChange[], cellId: string, modelId: string) => {
-        this.props.editCell(cellId, changes, modelId, this.getCurrentCode());
+    private onCodeChange = (changes: monacoEditor.editor.IModelContentChange[], cellId: string, modelId: string, isUndo: boolean, isRedo: boolean) => {
+        this.props.editCell(cellId, changes, modelId, this.getCurrentCode(), isUndo, isRedo);
     };
 
     private onCodeCreated = (_code: string, _file: string, cellId: string, modelId: string) => {
@@ -327,6 +327,8 @@ export class InteractiveCell extends React.Component<IInteractiveCellProps> {
         if (e.code === 'Escape') {
             this.editCellEscape(e);
         } else if (e.code === 'Enter' && e.shiftKey) {
+            this.editCellSubmit(e);
+        } else if (e.code === 'NumpadEnter' && e.shiftKey) {
             this.editCellSubmit(e);
         }
     };
