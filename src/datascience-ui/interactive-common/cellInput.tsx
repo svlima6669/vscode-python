@@ -26,7 +26,8 @@ interface ICellInputProps {
     editorMeasureClassName?: string;
     showLineNumbers?: boolean;
     font: IFont;
-    onCodeChange(changes: monacoEditor.editor.IModelContentChange[], cellId: string, modelId: string, isUndo: boolean, isRedo: boolean): void;
+    disableUndoStack: boolean;
+    onCodeChange(changes: monacoEditor.editor.IModelContentChange[], reverse: monacoEditor.editor.IModelContentChange[], cellId: string, modelId: string): void;
     onCodeCreated(code: string, file: string, cellId: string, modelId: string): void;
     openLink(uri: monacoEditor.Uri): void;
     keyDown?(cellId: string, e: IKeyboardEvent): void;
@@ -110,6 +111,7 @@ export class CellInput extends React.Component<ICellInputProps> {
                         showLineNumbers={this.props.showLineNumbers}
                         useQuickEdit={this.props.cellVM.useQuickEdit}
                         font={this.props.font}
+                        disableUndoStack={this.props.disableUndoStack}
                     />
                 </div>
             );
@@ -142,6 +144,7 @@ export class CellInput extends React.Component<ICellInputProps> {
                         ref={this.markdownRef}
                         useQuickEdit={false}
                         font={this.props.font}
+                        disableUndoStack={this.props.disableUndoStack}
                     />
                 </div>
             );
@@ -180,8 +183,8 @@ export class CellInput extends React.Component<ICellInputProps> {
         }
     };
 
-    private onCodeChange = (changes: monacoEditor.editor.IModelContentChange[], modelId: string, isUndo: boolean, isRedo: boolean) => {
-        this.props.onCodeChange(changes, this.props.cellVM.cell.id, modelId, isUndo, isRedo);
+    private onCodeChange = (changes: monacoEditor.editor.IModelContentChange[], reverse: monacoEditor.editor.IModelContentChange[], modelId: string) => {
+        this.props.onCodeChange(changes, reverse, this.props.cellVM.cell.id, modelId);
     };
 
     private onCodeCreated = (code: string, modelId: string) => {

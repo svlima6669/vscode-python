@@ -374,11 +374,9 @@ export interface ICellContentChange {
 
 export interface INotebookModelEditChange extends INotebookModelChange {
     kind: 'edit';
-    changes: ICellContentChange[];
-    newText: string;
-    cell: ICell;
-    isUndo: boolean;
-    isRedo: boolean;
+    forward: ICellContentChange[];
+    reverse: ICellContentChange[];
+    id: string;
 }
 
 export interface INotebookModelVersionChange extends INotebookModelChange {

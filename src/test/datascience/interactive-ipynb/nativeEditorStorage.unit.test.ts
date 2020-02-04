@@ -369,17 +369,15 @@ suite('Data Science - Native Editor Storage', () => {
         });
     }
 
-    function editCell(changes: ICellContentChange[], cell: ICell, newCode: string) {
+    function editCell(changes: ICellContentChange[], cell: ICell, _newCode: string) {
         return executeCommand(Commands.NotebookModel_Update, baseUri, {
             source: 'user',
             kind: 'edit',
             oldDirty: storage.isDirty,
             newDirty: true,
-            changes,
-            cell,
-            newText: newCode,
-            isUndo: false,
-            isRedo: false
+            forward: changes,
+            reverse: changes,
+            id: cell.id
         });
     }
 

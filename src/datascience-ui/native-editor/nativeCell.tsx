@@ -608,6 +608,7 @@ export class NativeCell extends React.Component<INativeCellProps> {
                         keyDown={this.keyDownInput}
                         showLineNumbers={this.props.cellVM.showLineNumbers}
                         font={this.props.font}
+                        disableUndoStack={true}
                     />
                 </div>
             );
@@ -624,8 +625,8 @@ export class NativeCell extends React.Component<INativeCellProps> {
         this.props.unfocusCell(this.cellId, this.getCurrentCode());
     };
 
-    private onCodeChange = (changes: monacoEditor.editor.IModelContentChange[], cellId: string, modelId: string, isUndo: boolean, isRedo: boolean) => {
-        this.props.editCell(cellId, changes, modelId, this.getCurrentCode(), isUndo, isRedo);
+    private onCodeChange = (changes: monacoEditor.editor.IModelContentChange[], reverse: monacoEditor.editor.IModelContentChange[], cellId: string, modelId: string) => {
+        this.props.editCell(cellId, modelId, changes, reverse, this.getCurrentCode());
     };
 
     private onCodeCreated = (_code: string, _file: string, cellId: string, modelId: string) => {

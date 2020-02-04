@@ -115,11 +115,9 @@ suite('DataScience Intellisense Unit Tests', () => {
             kind: 'edit',
             oldDirty: false,
             newDirty: true,
-            changes: [change],
-            cell: cells.find(c => c.id === id)!,
-            newText: newCode,
-            isUndo: false,
-            isRedo: false
+            forward: [change],
+            reverse: [change],
+            id
         });
     }
 
@@ -143,11 +141,9 @@ suite('DataScience Intellisense Unit Tests', () => {
             kind: 'edit',
             oldDirty: false,
             newDirty: true,
-            changes: [change],
-            cell: cells[cells.length - 1],
-            newText: code,
-            isUndo: false,
-            isRedo: false
+            forward: [change],
+            reverse: [change],
+            id: cells[cells.length - 1].id
         });
     }
 
@@ -171,11 +167,9 @@ suite('DataScience Intellisense Unit Tests', () => {
             kind: 'edit',
             oldDirty: false,
             newDirty: true,
-            changes: [change],
-            cell: cells[cells.length - 1],
-            newText: '',
-            isRedo: false,
-            isUndo: false
+            forward: [change],
+            reverse: [change],
+            id: cells[cells.length - 1].id
         });
     }
 

@@ -523,7 +523,7 @@ export class IntellisenseProvider implements IInteractiveWindowListener {
                 // This one can be ignored, it only clears outputs
                 break;
             case 'edit':
-                changes = document.reloadCell(request.cell.id, concatMultilineStringInput(request.cell.data.source));
+                changes = document.editCell(request.reverse, request.id);
                 break;
             case 'insert':
                 changes = document.remove(request.cell.id);
@@ -558,7 +558,7 @@ export class IntellisenseProvider implements IInteractiveWindowListener {
                 // This one can be ignored, it only clears outputs
                 break;
             case 'edit':
-                changes = document.editCell(request.changes, request.cell.id);
+                changes = document.editCell(request.forward, request.id);
                 break;
             case 'insert':
                 changes = document.insertCell(request.cell.id, concatMultilineStringInput(request.cell.data.source), request.codeCellAboveId);

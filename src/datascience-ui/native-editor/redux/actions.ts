@@ -82,14 +82,13 @@ export const actionCreators = {
     arrowDown: (cellId: string, code: string): CommonAction<ICodeAction> => ({ type: CommonActionType.ARROW_DOWN, payload: { cellId, code } }),
     editCell: (
         cellId: string,
-        changes: monacoEditor.editor.IModelContentChange[],
         modelId: string,
-        code: string,
-        isUndo: boolean,
-        isRedo: boolean
+        changes: monacoEditor.editor.IModelContentChange[],
+        reverse: monacoEditor.editor.IModelContentChange[],
+        code: string
     ): CommonAction<IEditCellAction> => ({
         type: CommonActionType.EDIT_CELL,
-        payload: { cellId, changes, modelId, code, isUndo, isRedo }
+        payload: { cellId, modelId, changes, reverse, id: cellId, code }
     }),
     linkClick: (href: string): CommonAction<ILinkClickAction> => ({ type: CommonActionType.LINK_CLICK, payload: { href } }),
     showPlot: (imageHtml: string): CommonAction<IShowPlotAction> => ({ type: CommonActionType.SHOW_PLOT, payload: { imageHtml } }),

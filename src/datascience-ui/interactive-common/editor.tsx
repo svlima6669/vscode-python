@@ -27,8 +27,9 @@ export interface IEditorProps {
     font: IFont;
     hasFocus: boolean;
     cursorPos: CursorPos;
+    disableUndoStack: boolean;
     onCreated(code: string, modelId: string): void;
-    onChange(changes: monacoEditor.editor.IModelContentChange[], isUndo: boolean, isRedo: boolean, model: monacoEditor.editor.ITextModel): void;
+    onChange(changes: monacoEditor.editor.IModelContentChange[], reverse: monacoEditor.editor.IModelContentChange[], model: monacoEditor.editor.ITextModel): void;
     openLink(uri: monacoEditor.Uri): void;
     keyDown?(e: IKeyboardEvent): void;
     focused?(): void;
@@ -165,6 +166,13 @@ export class Editor extends React.Component<IEditorProps, IEditorState> {
         const model = editor.getModel();
         this.setState({ editor, model: editor.getModel() });
 
+        // Disable undo/redo on the model if asked
+        // tslint:disable: no-any
+        if (this.props.disableUndoStack && (model as any).undo && (model as any).redo) {
+            (model as any).undo = noop;
+            (model as any).redo = noop;
+        }
+
         // Listen for model changes
         this.subscriptions.push(editor.onDidChangeModelContent(this.modelChanged));
 
@@ -182,9 +190,32 @@ export class Editor extends React.Component<IEditorProps, IEditorState> {
         this.subscriptions.push(editor.onDidBlurEditorWidget(this.props.unfocused ? this.props.unfocused : noop));
     };
 
+    private generateReverseChange(c: monacoEditor.editor.IModelContentChange): monacoEditor.editor.IModelContentChange {
+        const oldStart = this.state.model!.getPositionAt(c.rangeOffset);
+        const oldEnd = this.state.model!.getPositionAt(c.rangeOffset + c.rangeLength);
+        const oldText = this.state.model!.getValueInRange(c.range);
+        const oldRange: monacoEditor.IRange = {
+            startColumn: oldStart.column,
+            startLineNumber: oldStart.lineNumber,
+            endColumn: oldEnd.column,
+            endLineNumber: oldEnd.lineNumber
+        };
+        return {
+            rangeLength: c.text.length,
+            rangeOffset: c.rangeOffset,
+            text: oldText ? oldText : '',
+            range: oldRange
+        };
+    }
+
+    private generateReverseChanges(c: monacoEditor.editor.IModelContentChangedEvent): monacoEditor.editor.IModelContentChange[] {
+        // Reverse changes are always in reverse order
+        return c.changes.map(this.generateReverseChange).reverse();
+    }
+
     private modelChanged = (e: monacoEditor.editor.IModelContentChangedEvent) => {
         if (this.state.model) {
-            this.props.onChange(e.changes, e.isUndoing, e.isRedoing, this.state.model);
+            this.props.onChange(e.changes, this.generateReverseChanges(e), this.state.model);
         }
     };
 

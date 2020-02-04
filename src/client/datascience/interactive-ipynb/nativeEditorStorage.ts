@@ -12,7 +12,7 @@ import { GLOBAL_MEMENTO, ICryptoUtils, IDisposable, IDisposableRegistry, IExtens
 import { noop } from '../../common/utils/misc';
 import { PythonInterpreter } from '../../interpreter/contracts';
 import { Commands, Identifiers } from '../constants';
-import { INotebookModelEditChange, NotebookModelChange } from '../interactive-common/interactiveWindowTypes';
+import { ICellContentChange, NotebookModelChange } from '../interactive-common/interactiveWindowTypes';
 import { InvalidNotebookFileError } from '../jupyter/invalidNotebookFileError';
 import { LiveKernelModel } from '../jupyter/kernels/types';
 import { CellState, ICell, IJupyterExecution, IJupyterKernelSpec, INotebookModel, INotebookStorage } from '../types';
@@ -148,7 +148,7 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
                 changed = this.clearOutputs();
                 break;
             case 'edit':
-                changed = this.editCell(change);
+                changed = this.editCell(change.forward, change.id);
                 break;
             case 'insert':
                 changed = this.insertCell(change.cell, change.index);
@@ -191,7 +191,7 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
                 changed = true;
                 break;
             case 'edit':
-                changed = this.replaceCell(change.cell);
+                changed = this.editCell(change.reverse, change.id);
                 break;
             case 'insert':
                 changed = this.removeCell(change.cell);
@@ -227,27 +227,30 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
         return true;
     }
 
-    private editCell(change: INotebookModelEditChange): boolean {
-        // Apply the changes to the visible cell list. We won't get an update until
-        // submission otherwise
-        if (change.changes && change.changes.length) {
-            const first = change.changes[0];
-            const normalized = first.text.replace(/\r/g, '');
+    private applyCellContentChange(change: ICellContentChange, id: string): boolean {
+        const normalized = change.text.replace(/\r/g, '');
 
-            // Figure out which cell we're editing.
-            const index = this.cells.findIndex(c => c.id === change.cell.id);
-            if (index >= 0) {
-                // This is an actual edit.
-                const contents = concatMultilineStringInput(this.cells[index].data.source);
-                const before = contents.substr(0, first.rangeOffset);
-                const after = contents.substr(first.rangeOffset + first.rangeLength);
-                const newContents = `${before}${normalized}${after}`;
-                if (contents !== newContents) {
-                    const newCell = { ...this.cells[index], data: { ...this.cells[index].data, source: newContents } };
-                    this._state.cells[index] = this.asCell(newCell);
-                    return true;
-                }
+        // Figure out which cell we're editing.
+        const index = this.cells.findIndex(c => c.id === id);
+        if (index >= 0) {
+            // This is an actual edit.
+            const contents = concatMultilineStringInput(this.cells[index].data.source);
+            const before = contents.substr(0, change.rangeOffset);
+            const after = contents.substr(change.rangeOffset + change.rangeLength);
+            const newContents = `${before}${normalized}${after}`;
+            if (contents !== newContents) {
+                const newCell = { ...this.cells[index], data: { ...this.cells[index].data, source: newContents } };
+                this._state.cells[index] = this.asCell(newCell);
+                return true;
             }
+        }
+        return false;
+    }
+
+    private editCell(changes: ICellContentChange[], id: string): boolean {
+        // Apply the changes to the visible cell list
+        if (changes && changes.length) {
+            return changes.map(c => this.applyCellContentChange(c, id)).reduce((p, c) => p || c, false);
         }
 
         return false;
@@ -277,15 +280,6 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
     private removeCell(cell: ICell): boolean {
         this._state.cells = this.cells.filter(c => c.id !== cell.id);
         return true;
-    }
-
-    private replaceCell(cell: ICell): boolean {
-        const index = this.cells.findIndex(c => c.id === cell.id);
-        if (index >= 0) {
-            this._state.cells[index] = cell;
-            return true;
-        }
-        return false;
     }
 
     private clearOutputs(): boolean {

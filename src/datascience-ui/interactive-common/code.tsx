@@ -26,8 +26,9 @@ export interface ICodeProps {
     font: IFont;
     hasFocus: boolean;
     cursorPos: CursorPos;
+    disableUndoStack: boolean;
     onCreated(code: string, modelId: string): void;
-    onChange(changes: monacoEditor.editor.IModelContentChange[], modelId: string, isUndo: boolean, isRedo: boolean): void;
+    onChange(changes: monacoEditor.editor.IModelContentChange[], reverse: monacoEditor.editor.IModelContentChange[], modelId: string): void;
     openLink(uri: monacoEditor.Uri): void;
     keyDown?(e: IKeyboardEvent): void;
     focused?(): void;
@@ -76,6 +77,7 @@ export class Code extends React.Component<ICodeProps, ICodeState> {
                     showLineNumbers={this.props.showLineNumbers}
                     useQuickEdit={this.props.useQuickEdit}
                     font={this.props.font}
+                    disableUndoStack={this.props.disableUndoStack}
                 />
                 <div className={waterMarkClass} role="textbox" onClick={this.clickWatermark}>
                     {this.getWatermarkString()}
@@ -106,10 +108,10 @@ export class Code extends React.Component<ICodeProps, ICodeState> {
         return getLocString('DataScience.inputWatermark', 'Type code here and press shift-enter to run');
     };
 
-    private onModelChanged = (changes: monacoEditor.editor.IModelContentChange[], isUndo: boolean, isRedo: boolean, model: monacoEditor.editor.ITextModel) => {
+    private onModelChanged = (changes: monacoEditor.editor.IModelContentChange[], reverse: monacoEditor.editor.IModelContentChange[], model: monacoEditor.editor.ITextModel) => {
         if (!this.props.readOnly && model) {
             this.setState({ allowWatermark: model.getValueLength() === 0 });
         }
-        this.props.onChange(changes, model.id, isUndo, isRedo);
+        this.props.onChange(changes, reverse, model.id);
     };
 }
