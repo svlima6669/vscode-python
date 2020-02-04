@@ -9,6 +9,7 @@ import { extractInputText, IMainState } from '../../mainState';
 import { createPostableAction } from '../postOffice';
 import { Helpers } from './helpers';
 import { CommonReducerArg, ICellAction, IEditCellAction, ILinkClickAction, ISendCommandAction, IShowDataViewerAction, IShowPlotAction } from './types';
+import { Identifiers } from '../../../../client/datascience/constants';
 
 // These are all reducers that don't actually change state. They merely dispatch a message to the other side.
 export namespace Transfer {
@@ -169,7 +170,7 @@ export namespace Transfer {
     }
 
     export function editCell<T>(arg: CommonReducerArg<T, IEditCellAction>): IMainState {
-        const cellVM = arg.prevState.cellVMs.find(c => c.cell.id === arg.payload.cellId);
+        const cellVM = arg.payload.cellId === Identifiers.EditCellId ? arg.prevState.editCellVM : arg.prevState.cellVMs.find(c => c.cell.id === arg.payload.cellId);
         if (cellVM) {
             // Tell the underlying model on the extension side
             postModelEdit(arg, arg.payload.forward, arg.payload.reverse, cellVM.cell.id);
