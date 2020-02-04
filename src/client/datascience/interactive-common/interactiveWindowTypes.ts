@@ -334,7 +334,18 @@ export interface INotebookModelInsertChange extends INotebookModelChange {
     currentText: string;
 }
 
-export interface IRange {
+export interface IEditorPosition {
+    /**
+     * line number (starts at 1)
+     */
+    readonly lineNumber: number;
+    /**
+     * column (the first character in a line is between column 1 and column 2)
+     */
+    readonly column: number;
+}
+
+export interface IEditorRange {
     /**
      * Line number on which the range starts (starts at 1).
      */
@@ -353,11 +364,11 @@ export interface IRange {
     readonly endColumn: number;
 }
 
-export interface ICellContentChange {
+export interface IEditorContentChange {
     /**
      * The range that got replaced.
      */
-    readonly range: IRange;
+    readonly range: IEditorRange;
     /**
      * The offset of the range that got replaced.
      */
@@ -370,12 +381,16 @@ export interface ICellContentChange {
      * The new text for the range.
      */
     readonly text: string;
+    /**
+     * The cursor position to be set after the change
+     */
+    readonly position: IEditorPosition;
 }
 
 export interface INotebookModelEditChange extends INotebookModelChange {
     kind: 'edit';
-    forward: ICellContentChange[];
-    reverse: ICellContentChange[];
+    forward: IEditorContentChange[];
+    reverse: IEditorContentChange[];
     id: string;
 }
 

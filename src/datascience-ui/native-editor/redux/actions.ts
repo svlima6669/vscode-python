@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 'use strict';
-import * as monacoEditor from 'monaco-editor/esm/vs/editor/editor.api';
 import * as uuid from 'uuid/v4';
 import { NativeCommandType } from '../../../client/datascience/interactive-common/interactiveWindowTypes';
 import { IJupyterVariable, IJupyterVariablesRequest } from '../../../client/datascience/types';
@@ -23,6 +22,7 @@ import {
     IShowDataViewerAction,
     IShowPlotAction
 } from '../../interactive-common/redux/reducers/types';
+import { IMonacoModelContentChangeEvent } from '../../react-common/monacoHelpers';
 
 // See https://react-redux.js.org/using-react-redux/connect-mapdispatch#defining-mapdispatchtoprops-as-an-object
 export const actionCreators = {
@@ -80,15 +80,9 @@ export const actionCreators = {
     redo: (): CommonAction<never | undefined> => ({ type: CommonActionType.REDO }),
     arrowUp: (cellId: string, code: string): CommonAction<ICodeAction> => ({ type: CommonActionType.ARROW_UP, payload: { cellId, code } }),
     arrowDown: (cellId: string, code: string): CommonAction<ICodeAction> => ({ type: CommonActionType.ARROW_DOWN, payload: { cellId, code } }),
-    editCell: (
-        cellId: string,
-        modelId: string,
-        changes: monacoEditor.editor.IModelContentChange[],
-        reverse: monacoEditor.editor.IModelContentChange[],
-        code: string
-    ): CommonAction<IEditCellAction> => ({
+    editCell: (cellId: string, e: IMonacoModelContentChangeEvent): CommonAction<IEditCellAction> => ({
         type: CommonActionType.EDIT_CELL,
-        payload: { cellId, modelId, changes, reverse, id: cellId, code }
+        payload: { cellId, version: e.versionId, modelId: e.model.id, forward: e.forward, reverse: e.reverse, id: cellId, code: e.model.getValue() }
     }),
     linkClick: (href: string): CommonAction<ILinkClickAction> => ({ type: CommonActionType.LINK_CLICK, payload: { href } }),
     showPlot: (imageHtml: string): CommonAction<IShowPlotAction> => ({ type: CommonActionType.SHOW_PLOT, payload: { imageHtml } }),

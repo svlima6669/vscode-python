@@ -22,7 +22,7 @@ import { IFileSystem } from '../../../client/common/platform/types';
 import { IConfigurationService, ICryptoUtils, IDisposable, IExtensionContext } from '../../../client/common/types';
 import { EXTENSION_ROOT_DIR } from '../../../client/constants';
 import { Commands } from '../../../client/datascience/constants';
-import { ICellContentChange, InteractiveWindowMessages } from '../../../client/datascience/interactive-common/interactiveWindowTypes';
+import { IEditorContentChange, InteractiveWindowMessages } from '../../../client/datascience/interactive-common/interactiveWindowTypes';
 import { NativeEditorStorage } from '../../../client/datascience/interactive-ipynb/nativeEditorStorage';
 import { JupyterExecutionFactory } from '../../../client/datascience/jupyter/jupyterExecutionFactory';
 import { ICell, IJupyterExecution, INotebookServerOptions } from '../../../client/datascience/types';
@@ -369,7 +369,7 @@ suite('Data Science - Native Editor Storage', () => {
         });
     }
 
-    function editCell(changes: ICellContentChange[], cell: ICell, _newCode: string) {
+    function editCell(changes: IEditorContentChange[], cell: ICell, _newCode: string) {
         return executeCommand(Commands.NotebookModel_Update, baseUri, {
             source: 'user',
             kind: 'edit',
@@ -439,7 +439,11 @@ suite('Data Science - Native Editor Storage', () => {
                     },
                     rangeOffset: 4,
                     rangeLength: 0,
-                    text: 'a'
+                    text: 'a',
+                    position: {
+                        lineNumber: 1,
+                        column: 1
+                    }
                 }
             ],
             storage.cells[1],

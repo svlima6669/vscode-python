@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 'use strict';
-import * as monacoEditor from 'monaco-editor/esm/vs/editor/editor.api';
 
 import { IRefreshVariablesRequest } from '../../../client/datascience/interactive-common/interactiveWindowTypes';
 import { IJupyterVariable, IJupyterVariablesRequest } from '../../../client/datascience/types';
@@ -17,6 +16,7 @@ import {
     IShowDataViewerAction,
     IShowPlotAction
 } from '../../interactive-common/redux/reducers/types';
+import { IMonacoModelContentChangeEvent } from '../../react-common/monacoHelpers';
 
 // See https://react-redux.js.org/using-react-redux/connect-mapdispatch#defining-mapdispatchtoprops-as-an-object
 export const actionCreators = {
@@ -35,15 +35,9 @@ export const actionCreators = {
     gatherCell: (cellId: string): CommonAction<ICellAction> => ({ type: CommonActionType.GATHER_CELL, payload: { cellId } }),
     clickCell: (cellId: string): CommonAction<ICellAction> => ({ type: CommonActionType.CLICK_CELL, payload: { cellId } }),
     doubleClickCell: (cellId: string): CommonAction<ICellAction> => ({ type: CommonActionType.DOUBLE_CLICK_CELL, payload: { cellId } }),
-    editCell: (
-        cellId: string,
-        modelId: string,
-        changes: monacoEditor.editor.IModelContentChange[],
-        reverse: monacoEditor.editor.IModelContentChange[],
-        code: string
-    ): CommonAction<IEditCellAction> => ({
+    editCell: (cellId: string, e: IMonacoModelContentChangeEvent): CommonAction<IEditCellAction> => ({
         type: CommonActionType.EDIT_CELL,
-        payload: { cellId, modelId, changes, reverse, id: cellId, code }
+        payload: { cellId, version: e.versionId, modelId: e.model.id, forward: e.forward, reverse: e.reverse, id: cellId, code: e.model.getValue() }
     }),
     submitInput: (code: string, cellId: string): CommonAction<ICodeAction> => ({ type: CommonActionType.SUBMIT_INPUT, payload: { code, cellId } }),
     toggleVariableExplorer: (): CommonAction<never | undefined> => ({ type: CommonActionType.TOGGLE_VARIABLE_EXPLORER }),

@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 'use strict';
 import { expect } from 'chai';
-import * as monacoEditor from 'monaco-editor/esm/vs/editor/editor.api';
 import * as TypeMoq from 'typemoq';
 import * as uuid from 'uuid/v4';
 
@@ -12,7 +11,7 @@ import { IFileSystem } from '../../client/common/platform/types';
 import { IConfigurationService } from '../../client/common/types';
 import { Identifiers } from '../../client/datascience/constants';
 import { IntellisenseProvider } from '../../client/datascience/interactive-common/intellisense/intellisenseProvider';
-import { IInteractiveWindowMapping, InteractiveWindowMessages } from '../../client/datascience/interactive-common/interactiveWindowTypes';
+import { IEditorContentChange, IInteractiveWindowMapping, InteractiveWindowMessages } from '../../client/datascience/interactive-common/interactiveWindowTypes';
 import { ICell, IInteractiveWindowListener, IInteractiveWindowProvider, IJupyterExecution } from '../../client/datascience/types';
 import { IInterpreterService } from '../../client/interpreter/contracts';
 import { createEmptyCell, generateTestCells } from '../../datascience-ui/interactive-common/mainState';
@@ -99,7 +98,7 @@ suite('DataScience Intellisense Unit Tests', () => {
 
     function updateCell(newCode: string, oldCode: string, id: string): Promise<void> {
         const oldSplit = oldCode.split('\n');
-        const change: monacoEditor.editor.IModelContentChange = {
+        const change: IEditorContentChange = {
             range: {
                 startLineNumber: 1,
                 startColumn: 1,
@@ -108,7 +107,11 @@ suite('DataScience Intellisense Unit Tests', () => {
             },
             rangeOffset: 0,
             rangeLength: oldCode.length,
-            text: newCode
+            text: newCode,
+            position: {
+                column: 1,
+                lineNumber: 1
+            }
         };
         return sendMessage(InteractiveWindowMessages.UpdateModel, {
             source: 'user',
@@ -125,7 +128,7 @@ suite('DataScience Intellisense Unit Tests', () => {
         if (!line || !pos) {
             throw new Error('Invalid line or position data');
         }
-        const change: monacoEditor.editor.IModelContentChange = {
+        const change: IEditorContentChange = {
             range: {
                 startLineNumber: line,
                 startColumn: pos,
@@ -134,7 +137,11 @@ suite('DataScience Intellisense Unit Tests', () => {
             },
             rangeOffset: offset,
             rangeLength: 0,
-            text: code
+            text: code,
+            position: {
+                column: 1,
+                lineNumber: 1
+            }
         };
         return sendMessage(InteractiveWindowMessages.UpdateModel, {
             source: 'user',
@@ -151,7 +158,7 @@ suite('DataScience Intellisense Unit Tests', () => {
         if (!line || !startPos || !endPos) {
             throw new Error('Invalid line or position data');
         }
-        const change: monacoEditor.editor.IModelContentChange = {
+        const change: IEditorContentChange = {
             range: {
                 startLineNumber: line,
                 startColumn: startPos,
@@ -160,7 +167,11 @@ suite('DataScience Intellisense Unit Tests', () => {
             },
             rangeOffset: startPos,
             rangeLength: length,
-            text: ''
+            text: '',
+            position: {
+                column: 1,
+                lineNumber: 1
+            }
         };
         return sendMessage(InteractiveWindowMessages.UpdateModel, {
             source: 'user',

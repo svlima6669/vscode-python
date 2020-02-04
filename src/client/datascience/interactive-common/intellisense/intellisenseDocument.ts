@@ -8,7 +8,7 @@ import * as vscodeLanguageClient from 'vscode-languageclient';
 
 import { PYTHON_LANGUAGE } from '../../../common/constants';
 import { Identifiers } from '../../constants';
-import { ICellContentChange } from '../interactiveWindowTypes';
+import { IEditorContentChange } from '../interactiveWindowTypes';
 import { DefaultWordPattern, ensureValidWordDefinition, getWordAtText, regExpLeadsToEndlessLoop } from './wordHelper';
 
 class IntellisenseLine implements TextLine {
@@ -376,7 +376,7 @@ export class IntellisenseDocument implements TextDocument {
         return [];
     }
 
-    public editCell(editorChanges: ICellContentChange[], id: string): TextDocumentContentChangeEvent[] {
+    public editCell(editorChanges: IEditorContentChange[], id: string): TextDocumentContentChangeEvent[] {
         this._version += 1;
 
         // Convert the range to local (and remove 1 based)

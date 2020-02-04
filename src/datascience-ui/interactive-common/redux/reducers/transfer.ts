@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 'use strict';
-import { ICellContentChange, InteractiveWindowMessages, NotebookModelChange } from '../../../../client/datascience/interactive-common/interactiveWindowTypes';
+import { IEditorContentChange, InteractiveWindowMessages, NotebookModelChange } from '../../../../client/datascience/interactive-common/interactiveWindowTypes';
 import { CssMessages } from '../../../../client/datascience/messages';
 import { ICell } from '../../../../client/datascience/types';
 import { concatMultilineStringInput } from '../../../common';
@@ -95,7 +95,7 @@ export namespace Transfer {
         arg.queueAction(createPostableAction(InteractiveWindowMessages.UpdateModel, update));
     }
 
-    export function postModelEdit<T>(arg: CommonReducerArg<T>, forward: ICellContentChange[], reverse: ICellContentChange[], id: string) {
+    export function postModelEdit<T>(arg: CommonReducerArg<T>, forward: IEditorContentChange[], reverse: IEditorContentChange[], id: string) {
         postModelUpdate(arg, {
             source: 'user',
             kind: 'edit',
@@ -172,9 +172,9 @@ export namespace Transfer {
         const cellVM = arg.prevState.cellVMs.find(c => c.cell.id === arg.payload.cellId);
         if (cellVM) {
             // Tell the underlying model on the extension side
-            postModelEdit(arg, arg.payload.changes, arg.payload.reverse, cellVM.cell.id);
+            postModelEdit(arg, arg.payload.forward, arg.payload.reverse, cellVM.cell.id);
 
-            // Update the uncomitted text on the cell view model
+            // Update the uncommitted text on the cell view model
             // We keep this saved here so we don't re-render and we put this code into the input / code data
             // when focus is lost
             const index = arg.prevState.cellVMs.findIndex(c => c.cell.id === arg.payload.cellId);
@@ -183,7 +183,8 @@ export namespace Transfer {
                 const current = arg.prevState.cellVMs[index];
                 const newCell = {
                     ...current,
-                    uncomittedText: arg.payload.code
+                    uncommittedText: arg.payload.code,
+                    codeVersion: arg.payload.version
                 };
 
                 // tslint:disable-next-line: no-any

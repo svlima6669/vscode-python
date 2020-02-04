@@ -12,7 +12,7 @@ import { GLOBAL_MEMENTO, ICryptoUtils, IDisposable, IDisposableRegistry, IExtens
 import { noop } from '../../common/utils/misc';
 import { PythonInterpreter } from '../../interpreter/contracts';
 import { Commands, Identifiers } from '../constants';
-import { ICellContentChange, NotebookModelChange } from '../interactive-common/interactiveWindowTypes';
+import { IEditorContentChange, NotebookModelChange } from '../interactive-common/interactiveWindowTypes';
 import { InvalidNotebookFileError } from '../jupyter/invalidNotebookFileError';
 import { LiveKernelModel } from '../jupyter/kernels/types';
 import { CellState, ICell, IJupyterExecution, IJupyterKernelSpec, INotebookModel, INotebookStorage } from '../types';
@@ -227,7 +227,7 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
         return true;
     }
 
-    private applyCellContentChange(change: ICellContentChange, id: string): boolean {
+    private applyCellContentChange(change: IEditorContentChange, id: string): boolean {
         const normalized = change.text.replace(/\r/g, '');
 
         // Figure out which cell we're editing.
@@ -247,7 +247,7 @@ export class NativeEditorStorage implements INotebookModel, INotebookStorage, ID
         return false;
     }
 
-    private editCell(changes: ICellContentChange[], id: string): boolean {
+    private editCell(changes: IEditorContentChange[], id: string): boolean {
         // Apply the changes to the visible cell list
         if (changes && changes.length) {
             return changes.map(c => this.applyCellContentChange(c, id)).reduce((p, c) => p || c, false);

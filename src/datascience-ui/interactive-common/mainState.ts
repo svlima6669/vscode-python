@@ -10,6 +10,7 @@ import * as path from 'path';
 import { IDataScienceSettings } from '../../client/common/types';
 import { CellMatcher } from '../../client/datascience/cellMatcher';
 import { Identifiers } from '../../client/datascience/constants';
+import { IEditorPosition } from '../../client/datascience/interactive-common/interactiveWindowTypes';
 import { CellState, ICell, IDataScienceExtraSettings, IMessageCell } from '../../client/datascience/types';
 import { concatMultilineStringInput, splitMultilineString } from '../common';
 import { createCodeCell } from '../common/cellFactory';
@@ -35,10 +36,11 @@ export interface ICellViewModel {
     selected: boolean;
     focused: boolean;
     scrollCount: number;
-    cursorPos: CursorPos;
+    cursorPos: CursorPos | IEditorPosition;
     hasBeenRun: boolean;
     runDuringDebug?: boolean;
-    uncomittedText?: string;
+    uncommittedText?: string;
+    codeVersion?: number;
 }
 
 export type IMainState = {

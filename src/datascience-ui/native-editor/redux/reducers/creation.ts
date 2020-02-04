@@ -4,7 +4,7 @@
 import * as uuid from 'uuid/v4';
 
 import { noop } from '../../../../client/common/utils/misc';
-import { ICellContentChange, ILoadAllCells, NotebookModelChange } from '../../../../client/datascience/interactive-common/interactiveWindowTypes';
+import { IEditorContentChange, ILoadAllCells, NotebookModelChange } from '../../../../client/datascience/interactive-common/interactiveWindowTypes';
 import { ICell, IDataScienceExtraSettings } from '../../../../client/datascience/types';
 import { createCellVM, createEmptyCell, CursorPos, extractInputText, ICellViewModel, IMainState } from '../../../interactive-common/mainState';
 import { Helpers } from '../../../interactive-common/redux/reducers/helpers';
@@ -152,17 +152,19 @@ export namespace Creation {
         };
     }
 
-    export function editCell(arg: NativeEditorReducerArg<{ id: string; changes: ICellContentChange[] }>): IMainState {
+    export function applyCellEdit(arg: NativeEditorReducerArg<{ id: string; changes: IEditorContentChange[] }>): IMainState {
         const index = arg.prevState.cellVMs.findIndex(c => c.cell.id === arg.payload.id);
         if (index) {
             const newVM = { ...arg.prevState.cellVMs[index] };
             arg.payload.changes.forEach(c => {
-                const source = newVM.inputBlockText;
+                const source = newVM.uncommittedText ? newVM.uncommittedText : newVM.inputBlockText;
                 const before = source.slice(0, c.rangeOffset);
                 const after = source.slice(c.rangeOffset + c.rangeLength);
-                newVM.inputBlockText = `${before}${c.text}${after}`;
+                newVM.uncommittedText = `${before}${c.text}${after}`;
             });
-            newVM.cell.data.source = newVM.inputBlockText;
+            newVM.codeVersion = newVM.codeVersion ? newVM.codeVersion + 1 : 1;
+            newVM.inputBlockText = newVM.cell.data.source = newVM.uncommittedText!;
+            newVM.cursorPos = arg.payload.changes[0].position;
             const newVMs = [...arg.prevState.cellVMs];
             newVMs[index] = Helpers.asCellViewModel(newVM);
             return {
@@ -262,7 +264,7 @@ export namespace Creation {
             case 'clear':
                 return loadAllCells({ ...disabledQueueArg, payload: { cells: arg.payload.oldCells } });
             case 'edit':
-                return editCell({ ...disabledQueueArg, payload: { id: arg.payload.id, changes: arg.payload.reverse } });
+                return applyCellEdit({ ...disabledQueueArg, payload: { id: arg.payload.id, changes: arg.payload.reverse } });
             case 'insert':
                 return deleteCell({ ...disabledQueueArg, payload: { cellId: arg.payload.cell.id } });
             case 'remove':
@@ -288,7 +290,7 @@ export namespace Creation {
             case 'clear':
                 return Execution.clearAllOutputs(disabledQueueArg);
             case 'edit':
-                return editCell({ ...disabledQueueArg, payload: { id: arg.payload.id, changes: arg.payload.forward } });
+                return applyCellEdit({ ...disabledQueueArg, payload: { id: arg.payload.id, changes: arg.payload.forward } });
             case 'insert':
                 return insertAbove({ ...disabledQueueArg, payload: { newCellId: arg.payload.cell.id, cellId: arg.payload.codeCellAboveId } });
             case 'remove':

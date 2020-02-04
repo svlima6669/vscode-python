@@ -9,6 +9,7 @@ import * as React from 'react';
 
 import { concatMultilineStringInput } from '../common';
 import { IKeyboardEvent } from '../react-common/event';
+import { IMonacoModelContentChangeEvent } from '../react-common/monacoHelpers';
 import { Code } from './code';
 import { InputHistory } from './inputHistory';
 import { ICellViewModel, IFont } from './mainState';
@@ -17,6 +18,7 @@ import { Markdown } from './markdown';
 // tslint:disable-next-line: no-require-importss
 interface ICellInputProps {
     cellVM: ICellViewModel;
+    codeVersion: number;
     codeTheme: string;
     testMode?: boolean;
     history: InputHistory | undefined;
@@ -27,7 +29,7 @@ interface ICellInputProps {
     showLineNumbers?: boolean;
     font: IFont;
     disableUndoStack: boolean;
-    onCodeChange(changes: monacoEditor.editor.IModelContentChange[], reverse: monacoEditor.editor.IModelContentChange[], cellId: string, modelId: string): void;
+    onCodeChange(e: IMonacoModelContentChangeEvent): void;
     onCodeCreated(code: string, file: string, cellId: string, modelId: string): void;
     openLink(uri: monacoEditor.Uri): void;
     keyDown?(cellId: string, e: IKeyboardEvent): void;
@@ -97,7 +99,7 @@ export class CellInput extends React.Component<ICellInputProps> {
                         readOnly={!this.props.cellVM.editable}
                         showWatermark={this.props.showWatermark}
                         ref={this.codeRef}
-                        onChange={this.onCodeChange}
+                        onChange={this.props.onCodeChange}
                         onCreated={this.onCodeCreated}
                         outermostParentClass="cell-wrapper"
                         monacoTheme={this.props.monacoTheme}
@@ -112,6 +114,8 @@ export class CellInput extends React.Component<ICellInputProps> {
                         useQuickEdit={this.props.cellVM.useQuickEdit}
                         font={this.props.font}
                         disableUndoStack={this.props.disableUndoStack}
+                        version={this.props.codeVersion}
+                        previousCode={this.props.cellVM.uncommittedText}
                     />
                 </div>
             );
@@ -130,7 +134,7 @@ export class CellInput extends React.Component<ICellInputProps> {
                         markdown={source}
                         codeTheme={this.props.codeTheme}
                         testMode={this.props.testMode ? true : false}
-                        onChange={this.onCodeChange}
+                        onChange={this.props.onCodeChange}
                         onCreated={this.onCodeCreated}
                         outermostParentClass="cell-wrapper"
                         hasFocus={this.props.cellVM.focused}
@@ -145,6 +149,8 @@ export class CellInput extends React.Component<ICellInputProps> {
                         useQuickEdit={false}
                         font={this.props.font}
                         disableUndoStack={this.props.disableUndoStack}
+                        version={this.props.codeVersion}
+                        previousMarkdown={this.props.cellVM.uncommittedText}
                     />
                 </div>
             );
@@ -181,10 +187,6 @@ export class CellInput extends React.Component<ICellInputProps> {
         if (this.props.unfocused) {
             this.props.unfocused(this.props.cellVM.cell.id);
         }
-    };
-
-    private onCodeChange = (changes: monacoEditor.editor.IModelContentChange[], reverse: monacoEditor.editor.IModelContentChange[], modelId: string) => {
-        this.props.onCodeChange(changes, reverse, this.props.cellVM.cell.id, modelId);
     };
 
     private onCodeCreated = (code: string, modelId: string) => {

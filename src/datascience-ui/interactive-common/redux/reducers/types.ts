@@ -1,9 +1,8 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 'use strict';
-import * as monacoEditor from 'monaco-editor/esm/vs/editor/editor.api';
 
-import { IShowDataViewer, NativeCommandType } from '../../../../client/datascience/interactive-common/interactiveWindowTypes';
+import { IEditorContentChange, IShowDataViewer, NativeCommandType } from '../../../../client/datascience/interactive-common/interactiveWindowTypes';
 import { ActionWithPayload, ReducerArg } from '../../../react-common/reduxUtils';
 import { CursorPos, IMainState } from '../../mainState';
 
@@ -107,10 +106,11 @@ export interface ICodeAction extends ICellAction {
 }
 
 export interface IEditCellAction extends ICodeAction {
-    changes: monacoEditor.editor.IModelContentChange[];
-    reverse: monacoEditor.editor.IModelContentChange[];
+    forward: IEditorContentChange[];
+    reverse: IEditorContentChange[];
     id: string;
     modelId: string;
+    version: number;
 }
 
 // I.e. when using the operation `add`, we need the corresponding `IAddCellAction`.
